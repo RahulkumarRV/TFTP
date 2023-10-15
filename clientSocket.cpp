@@ -5,27 +5,33 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+using namespace std;
 
 int main() {
-    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    const char* ip = "121.0.0.1";
-    struct sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_port = htons(9092);
-    // inet_pton(AF_INET, ip, &address.sin_addr);
-    address.sin_addr.s_addr = INADDR_ANY;
+    
+    int sockfd;
+    struct sockaddr_in serverAddr;
 
-    int result = connect(serverSocket, (struct sockaddr*)&address, sizeof(address));
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (result == 0)
-        printf("Connected successfully\n");
-    else
-        printf("Connection failed\n");
+    if(sockfd < 0){
+        cerr << "socket error while opening socket" << endl;
+        return -1;
+    }
 
-    char buffer[1024];
+    memset((char *) &serverAddr, 0, sizeof(serverAddr));
 
-    recv(serverSocket, &buffer, sizeof(buffer), 0);
-    printf("response : %s\n", buffer);
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(9092);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    const char *message = "Hello world";
+
+    sendto(sockfd, message, strlen(message), 0,
+    (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+
+    cout<< "Message sent to server." << endl;
+
 
     return 0;
 }
