@@ -1,18 +1,19 @@
 #include <iostream>
 #include <stdlib.h>
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
 
 int main() {
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    const char* ip = "142.250.188.46";
+    const char* ip = "121.0.0.1";
     struct sockaddr_in address;
     address.sin_family = AF_INET;
-    address.sin_port = htons(80);
-    inet_pton(AF_INET, ip, &address.sin_addr);
+    address.sin_port = htons(9092);
+    // inet_pton(AF_INET, ip, &address.sin_addr);
+    address.sin_addr.s_addr = INADDR_ANY;
 
     int result = connect(serverSocket, (struct sockaddr*)&address, sizeof(address));
 
@@ -21,13 +22,9 @@ int main() {
     else
         printf("Connection failed\n");
 
-    
-    const char* message = "GET // HTTP/1.1\r\nHost:google.com\r\n\r\n";
-    send(serverSocket, message, strlen(message), 0);
-
     char buffer[1024];
-    recv(serverSocket, buffer, 1024, 0);
 
+    recv(serverSocket, &buffer, sizeof(buffer), 0);
     printf("response : %s\n", buffer);
 
     return 0;
