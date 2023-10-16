@@ -3,41 +3,19 @@
 #include <chrono>
 using namespace std;
 
-int evenSum = 0;
-int oddSum = 0;
-
-void evenSumFunction(int start, int end) {
-    for (int i = start; i < end; i++) {
-        if ((i & 1) == 0) {
-            evenSum += i;
-        }
+void print(int count){
+    while(count --> 0){
+        cout << "printing " << count << endl;
     }
+    this_thread::sleep_for(std::chrono::seconds(3));
 }
 
-void oddSumFunction(int start, int end) {
-    for (int i = start; i < end; i++) {
-        if ((i & 1) == 1) {
-            oddSum += i;
-        }
-    }
-}
 
 int main() {
-    int start = 0, end = 190000000;
-    auto starttime = std::chrono::high_resolution_clock::now();
-
-    // Use std::thread to create threads
-    std::thread t1(evenSumFunction, start, end);
-    std::thread t2(oddSumFunction, start, end);
-
-    t1.join();
-    t2.join();
-    // evenSumFunction(start, end);
-    // oddSumFunction(start, end);
-
-    auto endtime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = endtime - starttime;
-    std::cout << "Time taken: " << duration.count() << " seconds\n";
-
+    // program not execute after join until the thread not completed
+    thread t(print, 5);
+    cout << "join before print" << endl;
+    t.join();
+    cout << "join after print" << endl;
     return 0;
 }
