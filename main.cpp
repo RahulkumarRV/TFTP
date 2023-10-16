@@ -8,15 +8,15 @@ void print(int count){
         cout << "printing " << count << endl;
     }
     this_thread::sleep_for(std::chrono::seconds(3));
+    cout << "print function completed" << endl;
 }
 
 
 int main() {
-    // program not execute after join until the thread not completed
+    
     thread t(print, 5);
-    cout << "join before print" << endl;
-    if (t.joinable()) // used to check if the thread is joinable or already joined or has time to join
-        t.join();
-    cout << "join after print" << endl;
+    t.detach(); // seperate the this thread from the main thread, this thread excutes independently
+    cout<< "Main thread completed" << endl;
+    this_thread::sleep_for(std::chrono::seconds(5));
     return 0;
 }
