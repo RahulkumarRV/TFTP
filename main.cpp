@@ -15,7 +15,8 @@ int main() {
     // program not execute after join until the thread not completed
     thread t(print, 5);
     cout << "join before print" << endl;
-    t.join();
+    if (t.joinable()) // used to check if the thread is joinable or already joined or has time to join
+        t.join();
     cout << "join after print" << endl;
     return 0;
 }
