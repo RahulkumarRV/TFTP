@@ -7,15 +7,15 @@ mutex m;
 
 int count = 0;
 
-// mutext help to lock the critical section, for more details refer to internet
+// try lock return a bool value if true then you can access to critical section other wise you continue to other part but not block
 void print(int n, int number) {
     for (int i = 0; i < n; i++) {
-        m.lock();
-        count++;
-        cout<< count << " " << number << endl;
-        this_thread::sleep_for(chrono::seconds(1));
-        m.unlock();
-        cout << number << " coming out " << endl;
+        
+        if(m.try_lock()){
+            cout << count << " " << number <<endl;
+            this_thread::sleep_for(chrono::seconds(1));
+            m.unlock();
+        }
     }
 }
 
