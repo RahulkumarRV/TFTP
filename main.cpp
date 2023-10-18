@@ -1,39 +1,39 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 using namespace std;
 
-timed_mutex m;
+condition_variable cv;
+mutex m;
+int balance = 0;
 
-int count = 0;
-
-// try lock for a given time return a bool value if true then you can access to critical section other wise you continue to other part but not block
-void print(int n, int number) {
-    for (int i = 0; i < n; i++) {
-        
-        if(m.try_lock_for(chrono::seconds(2))){
-            count++;
-            cout << count << " " << number <<endl;
-            this_thread::sleep_for(chrono::seconds(1));
-            m.unlock();
-        }
-    }
+void addMoney(int money){
+    lock_guard<mutex> lg(m);
+    balance += money;
+    cout << "Amount Added Currect Balance: " << balance << endl;
+    cv.notify_one();
 }
-0 > 1, 2
-1 > 
-2 > 2, 1
-3 > 
 
+void withdrawMoney(int money){
+    unique_lock<mutex> ul(m);
+    cv.wait(ul, [] { return (balance != 0) ? true : false; });
+    if(balance >= money) {
+        balance -= money;
+        cout << "Amount Deducted Currect Balance: " << balance << endl;
+    }else{
+        cout << "Amount can't be deducted. Current balance is lesser than"<< money << endl;
+    }
+
+    cout << "current balance: " << balance << endl;
+
+}
 
 int main() {
-    thread t(print, 2, 1);
-    thread t2(print, 2, 2);
-
-    // Join the threads to wait for them to finish
+    thread t(withdrawMoney, 600);
+    thread t2(addMoney, 500);
     t.join();
     t2.join();
-
-    cout << "count: " << count << endl;
 
     return 0;
 }
