@@ -5,58 +5,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include "../connect.h"
 using namespace std;
-
-// Structure to represent the RRQ packet header
-struct tftphdr {
-    short th_opcode;   // Opcode (Read Request: 1)
-    string th_stuff;   // Filename, mode, and null bytes
-};
-
-void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*& mode) {
-    // Extract opcode
-    memcpy(&opcode, header, 2);
-    opcode = ntohs(opcode);
-
-    // Set filename and mode pointers
-    filename = header + 2;
-    mode = filename + strlen(filename) + 1;
-}
-
-void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
-    memcpy(&opcode, header, 2);
-    opcode = ntohs(opcode);
-    memcpy(&blocknumber, header + 2, 2);
-    blocknumber = ntohs(blocknumber);
-}
-
-void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, char*& errormessage){
-    memcpy(&opcode, header, sizeof(opcode));
-    opcode = ntohs(opcode);
-    memcpy(&errorcode, header + sizeof(opcode), sizeof(errorcode));
-    errorcode = ntohs(errorcode);
-    errormessage = header + sizeof(opcode) + sizeof(errorcode);
-}
-
-uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber, char*& data, size_t packetSize) {
-    // Extract opcode
-    memcpy(&opcode, header, sizeof(opcode));
-    opcode = ntohs(opcode);
-
-    // Extract block number
-    memcpy(&blocknumber, header + sizeof(opcode), sizeof(blocknumber));
-    blocknumber = ntohs(blocknumber);
-
-    // Calculate the length of the data portion based on the packet size and header length
-    size_t headerSize = sizeof(opcode) + sizeof(blocknumber);
-    size_t dataLength = packetSize - headerSize;
-
-    // Set the data pointer
-    data = header + headerSize;
-
-    return dataLength;
-}
-
 
 
 int main(){

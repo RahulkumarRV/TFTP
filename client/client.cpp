@@ -5,65 +5,9 @@
 #include <string>
 #include <cstring>
 #include <utility>
-
+#include "../connect.h"
 using namespace std;
 
-pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {
-    // Calculate the buffer size
-    size_t buffer_size = 2 + filename.length() + 1 + mode.length() + 1;
-    
-    // Allocate memory for the buffer
-    char* buffer = new char[buffer_size];
-    
-    // Copy data into the buffer
-    memcpy(buffer, &opcode, 2);
-    memcpy(buffer + 2, filename.c_str(), filename.length());
-    buffer[2 + filename.length()] = 0; // Null separator
-    memcpy(buffer + 2 + filename.length() + 1, mode.c_str(), mode.length());
-    buffer[buffer_size - 1] = 0; // Null terminator
-    // return the buffer containing header and it's size 
-    return make_pair(buffer, buffer_size);
-}
-
-pair<char*, size_t> create_ACK_header(uint16_t opcode, uint16_t blocknumber) {
-    char* buffer = new char[4];
-    size_t buffer_size = 4;
-    memcpy(buffer, &opcode, 2);
-    memcpy(buffer + 2, &blocknumber, 2);
-
-    return make_pair(buffer, buffer_size);
-}
-
-pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, string errormessage){
-    size_t buffer_size = 4 + errormessage.length() + 1;
-
-    char *buffer = new char[buffer_size];
-    memcpy(buffer, &opcode, 2);
-    memcpy(buffer + 2, &errorcode, 2);
-    memcpy(buffer + 4, errormessage.c_str(), errormessage.length());
-    buffer[buffer_size] = '\0';
-
-    return make_pair(buffer, buffer_size);
-}
-
-pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, string data){
-    // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
-    if(data.length() > 508){
-        cout << "data length exceeds 518 bytes";
-        return make_pair(nullptr, -1);
-    } 
-    size_t buffer_size = 4 + data.length();
-
-    char *buffer = new char[buffer_size];
-    memcpy(buffer, &opcode, 2);
-    memcpy(buffer + 2, &blocknumber, 2);
-    memcpy(buffer + 4, data.c_str(), data.length());
-    // data is null character terminated if and only if it's size is lesser thatn 518 bytes
-    if(data.length() < 508){
-        buffer[buffer_size] = '\0';
-    }
-    return make_pair(buffer, buffer_size);
-}
 
 int main() {
     int sockfd;
@@ -108,14 +52,11 @@ int main() {
     while(number_of_bytes < data.length()){
         offset = number_of_bytes;
         number_of_bytes += data.length() < 508 ? data.length() : 508;
-        cout << data.substr(offset, number_of_bytes) << endl;
         pair<char*, uint16_t> header = create_DATA_header(opcode, blocknumber, data.substr(offset, number_of_bytes));
         cout<<" header size : " << header.second << endl;
         sendto(sockfd, header.first, header.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
         delete[] header.first; // Clean up the buffer
     }
-
-    
 
     return 0;
 }
