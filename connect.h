@@ -164,7 +164,7 @@ bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int 
         char *data;
         buffer = databuffer;
         parse_DATA_header(databuffer, opcode, blocknumber, data, bytesReceived);
-        cout << " checkt response : " << data << " opcode " << opcode << " block number " << blocknumber << " recived bytes " << bytesReceived << endl;
+        cout << "data : " << data << " opcode : " << opcode << " blocknumber : " << blocknumber << endl;
         if (bytesReceived < 0) {
             std::cerr << "recvfrom failed" << std::endl;
             return false;
@@ -180,11 +180,13 @@ void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     sockaddr_in newAddress;
     memset((char *)&address, 0, sizeof(address));
     uint16_t opcode, errorcode, blocknumber;
+    char *data;
     while(moreDataAvailable){
         opcode = getopcode(buffer);
         if(opcode == DATA){
             // if the comming packet is data packet then store the data and send the ACK for this packet
-
+            parse_DATA_header(buffer, opcode, blocknumber, data, MAX_PACKET_SIZE);
+            cout << "data 1 : " << data << " opcode : " << opcode << " blocknumber : " << blocknumber << endl;
 
         }else{
             
