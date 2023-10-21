@@ -8,8 +8,10 @@
 #include "../connect.h"
 using namespace std;
 
+int serverport = 9092;
+uint16_t maxbuffersize = 512;
 
-int main() {
+int main(int argc, char **argv) {
     int sockfd;
     struct sockaddr_in serverAddr;
 
@@ -22,7 +24,7 @@ int main() {
 
     memset((char*)&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(9092); // TFTP default port
+    serverAddr.sin_port = htons(serverport); // TFTP default port
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     // Create an RRQ packet
@@ -51,7 +53,7 @@ int main() {
 
     while(number_of_bytes < data.length()){
         offset = number_of_bytes;
-        number_of_bytes += data.length() < 508 ? data.length() : 508;
+        number_of_bytes += data.length() < maxbuffersize - 4 ? data.length() : maxbuffersize - 4;
         pair<char*, uint16_t> header = create_DATA_header(opcode, blocknumber, data.substr(offset, number_of_bytes));
         cout<<" header size : " << header.second << endl;
         sendto(sockfd, header.first, header.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));

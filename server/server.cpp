@@ -8,8 +8,10 @@
 #include "../connect.h"
 using namespace std;
 
+int myport = 9092;
+uint16_t maxbuffersize = 512;
 
-int main(){
+int main(int argc, char **argv){
     
     int sockfd;
     struct sockaddr_in serverAddr, clientAddr;
@@ -23,7 +25,7 @@ int main(){
 
     memset((char *) &serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(9092);
+    serverAddr.sin_port = htons(myport);
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     int status = bind(sockfd, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
@@ -39,7 +41,7 @@ int main(){
     memset((char *) &clientAddr, 0, sizeof(clientAddr));
     
 
-    char buffer[512]; // Adjust the buffer size accordingly
+    char buffer[maxbuffersize]; // Adjust the buffer size accordingly
 
     while(true){
         // response for packet
@@ -64,8 +66,8 @@ int main(){
         cout << "data : " << data << endl;
         cout << "data size : " << strlen(data) << endl;
         cout << "recived number of bytes : " << receive_status<<endl;
-        
-        if(receive_status < 512){
+        cout << "client port : " << clientAddr.sin_port<<endl;
+        if(receive_status < maxbuffersize){
             break;
         }
          
