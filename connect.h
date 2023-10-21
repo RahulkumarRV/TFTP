@@ -18,13 +18,12 @@ enum packet_type {
     ERROR
 }PACKET_TYPE;
 
+// create the rrq or wrq header which will contains the opcode, file name and mode of transfer
 pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {
     // Calculate the buffer size
     size_t buffer_size = sizeof(opcode) + filename.length() + 1 + mode.length() + 1;
-    
     // Allocate memory for the buffer
     char* buffer = new char[buffer_size];
-    
     // Copy data into the buffer
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), filename.c_str(), filename.length());
@@ -35,6 +34,7 @@ pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filenam
     return make_pair(buffer, buffer_size);
 }
 
+// create the acknowledgement header which will contains the opcode and block number 
 pair<char*, size_t> create_ACK_header(uint16_t opcode, uint16_t blocknumber) {
     uint16_t size = sizeof(opcode) + sizeof(blocknumber);
     char* buffer = new char[size];
@@ -44,10 +44,10 @@ pair<char*, size_t> create_ACK_header(uint16_t opcode, uint16_t blocknumber) {
     return make_pair(buffer, buffer_size);
 }
 
+// create the data header of the tftp header which contains the opcode and error information
 pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, string errormessage){
     uint16_t size = sizeof(opcode) + sizeof(errorcode);
     size_t buffer_size = size + errormessage.length() + 1;
-
     char *buffer = new char[buffer_size];
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), &errorcode, sizeof(errorcode));
@@ -57,6 +57,7 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
     return make_pair(buffer, buffer_size);
 }
 
+// create the data header of the tftp, which will be contains the opcode, block number and data
 pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, string data){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
@@ -78,7 +79,7 @@ pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, st
     return make_pair(buffer, buffer_size);
 }
 
-
+// parse the rrq and wrq header of the packet
 void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*& mode) {
     // Extract opcode
     memcpy(&opcode, header, sizeof(opcode));
@@ -89,6 +90,7 @@ void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*
     mode = filename + strlen(filename) + 1;
 }
 
+// parse the acknowledgment header of tftp to get the opcode and block number
 void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
@@ -96,6 +98,7 @@ void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
     blocknumber = ntohs(blocknumber);
 }
 
+// parse the tftp header to extract the error code information 
 void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, char*& errormessage){
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
@@ -104,6 +107,7 @@ void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, cha
     errormessage = header + sizeof(opcode) + sizeof(errorcode);
 }
 
+// parse the tftp header to extract the opcode, block number and data 
 uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber, char*& data, size_t packetSize) {
     // Extract opcode
     memcpy(&opcode, header, sizeof(opcode));
@@ -123,12 +127,16 @@ uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber
     return dataLength;
 }
 
+// the the opcode of the tftp header from the response buffer
 uint16_t getopcode(char buffer[]){
     uint16_t opcode;
     memcpy(&opcode, buffer, sizeof(opcode));
     return ntohs(opcode);
 }
 
+// wait for the response until timeout is reached
+// if response is come before the timeout then return true and pass the result in parms which pass as refrence
+// else return false
 bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;        // seconds
@@ -164,16 +172,6 @@ bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int 
     }
 }
 
-bool waitForResponse(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout, int retries) {
-    
-    while(retries-- > 0) {
-        if(waitForTimeOut(sockfd, buffer, address, timeout)){
-            return true;
-        }
-        cout << "retring " << retries << endl;
-    }
-    return false;
-}
 
 void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     uint16_t offset = 0, number_of_bytes = 0;
@@ -181,11 +179,12 @@ void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     sockaddr_in newAddress;
     memset((char *)&address, 0, sizeof(address));
     uint16_t opcode, errorcode, blocknumber;
-    // cout << getopcode(buffer) << " size : " << sizeof(buffer) << endl;
     while(moreDataAvailable){
         opcode = getopcode(buffer);
         if(opcode == DATA){
-            cout <<"response : " << buffer + 4<< endl;
+            // if the comming packet is data packet then store the data and send the ACK for this packet
+
+
         }else{
             
             

@@ -27,18 +27,22 @@ int main(int argc, char **argv) {
     serverAddr.sin_port = htons(serverport); // TFTP default port
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
-
     // Create an RRQ packet
     uint16_t opcode = htons(1); // Opcode for RRQ
     string filename = "example.txt";
     string mode = "netascii";
-    pair<char*, size_t> header =  create_RRQ_WRQ_header(opcode, filename, mode);
-
-    sendto(sockfd, header.first, header.second,0,  (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-    delete[] header.first;
     char *buffer;
-    if(waitForResponse(sockfd, buffer, serverAddr, 1000, 3)){
-        reciveData(sockfd, buffer, serverAddr);
+    pair<char*, size_t> header =  create_RRQ_WRQ_header(opcode, filename, mode);
+    int trycount = 3;
+    // this while loop will take care if the send request is unsuccessful then it rety and wait for the timeout time for next resend until the limit of retries is reached
+    while(trycount-- > 0){
+        sendto(sockfd, header.first, header.second,0,  (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+        delete[] header.first;
+        if(waitForTimeOut(sockfd, buffer, serverAddr, 1000)){
+            // if the server respose to the RRQ then client can start collect the data
+            reciveData(sockfd, buffer, serverAddr);
+            break;
+        }
     }
 
 
