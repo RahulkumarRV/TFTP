@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
         cerr << "socket error while creating socket" << endl;
         return -1;
     }
-
+    // create the address of the server accroding the given port and ip address
     memset((char*)&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(serverport); // TFTP default port

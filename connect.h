@@ -8,8 +8,9 @@
 #include <string.h>
 using namespace std;
 
-#define MAX_PACKET_SIZE 512
+#define MAX_PACKET_SIZE 512 // sotre the maximum packet size including the header and data 
 
+// use as palceholder for the type of the request packet
 enum packet_type {
     RRQ = 1,
     WWQ,
@@ -172,7 +173,7 @@ bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int 
     }
 }
 
-
+// it handle the data coming for the requested rrq request
 void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
@@ -194,7 +195,7 @@ void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     }
 }
 
-
+// genreate the random port number for the given address and bind it to the generated port number in the given range
 int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr, int sockfd) 
 {
     int countoftry = 100;
@@ -209,7 +210,8 @@ int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr
     return -1;
 }
 
-
+// this code used by the server to handle the client 
+// it also make connection to then new port number the comming client to communicate futher
 void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus) {
     char clientIP[INET_ADDRSTRLEN]; // client IP address
     inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
@@ -230,6 +232,6 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     socklen_t addrLen = sizeof(clientAddr);
     uint16_t opcode = htons(3), blocknumber = htons(1);
     pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, "rahul kumar");
-    // sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+    sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
     
 }
