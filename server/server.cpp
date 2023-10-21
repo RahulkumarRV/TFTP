@@ -58,30 +58,7 @@ int main(int argc, char **argv){
             }); 
             t.join();
         }
-        // if(receive_status < 0){
-        //     cerr<< "recvfrom failed"<<endl;
-        //     break;
-        // }
-        // if(receive_status == 0){
-        //     cout << "connection closed"<<endl;
-        //     break;
-        // }
-        // // Extract the opcode from the received data (first 2 bytes)
-        // uint16_t opcode;
-        // uint16_t blocknumber;
-        // char *data;
-        // uint16_t data_size = parse_DATA_header(buffer, opcode, blocknumber, data, receive_status);
-        // cout << "Opcode : " << opcode << endl;
-        // cout << "block number : " << blocknumber << endl;
-        // data[data_size] = '\0';
-        // cout << "data : " << data << endl;
-        // cout << "data size : " << strlen(data) << endl;
-        // cout << "recived number of bytes : " << receive_status<<endl;
-        // cout << "client port : " << clientAddr.sin_port<<endl;
-        // if(receive_status < maxbuffersize){
-        //     break;
-        // }
-         
+     
     }
 
     return 0;

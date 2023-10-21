@@ -129,7 +129,7 @@ uint16_t getopcode(char buffer[]){
     return ntohs(opcode);
 }
 
-bool waitForTimeOut(int sockfd, char* buffer, struct sockaddr_in& address, int timeout) {
+bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;        // seconds
     tv.tv_usec = (timeout % 1000) * 1000;  // microseconds
@@ -148,11 +148,13 @@ bool waitForTimeOut(int sockfd, char* buffer, struct sockaddr_in& address, int t
         return false;
     } else {
         // Data available to read
+        char databuffer[MAX_PACKET_SIZE];
         socklen_t addressLen = sizeof(address);
-        int bytesReceived = recvfrom(sockfd, buffer, bufferSize, 0, (struct sockaddr*)&address, &addressLen);
+        int bytesReceived = recvfrom(sockfd, databuffer, sizeof(databuffer), 0, (struct sockaddr*)&address, &addressLen);
         uint16_t opcode, blocknumber;
         char *data;
-        parse_DATA_header(buffer, opcode, blocknumber, data, bytesReceived);
+        buffer = databuffer;
+        parse_DATA_header(databuffer, opcode, blocknumber, data, bytesReceived);
         cout << " checkt response : " << data << " opcode " << opcode << " block number " << blocknumber << " recived bytes " << bytesReceived << endl;
         if (bytesReceived < 0) {
             std::cerr << "recvfrom failed" << std::endl;
@@ -162,7 +164,7 @@ bool waitForTimeOut(int sockfd, char* buffer, struct sockaddr_in& address, int t
     }
 }
 
-bool waitForResponse(int sockfd, char* buffer, struct sockaddr_in& address, int timeout, int retries) {
+bool waitForResponse(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout, int retries) {
     
     while(retries-- > 0) {
         if(waitForTimeOut(sockfd, buffer, address, timeout)){
@@ -173,7 +175,7 @@ bool waitForResponse(int sockfd, char* buffer, struct sockaddr_in& address, int 
     return false;
 }
 
-void reciveData(int sockfd, char* buffer, struct sockaddr_in& address){
+void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
     sockaddr_in newAddress;
@@ -183,10 +185,9 @@ void reciveData(int sockfd, char* buffer, struct sockaddr_in& address){
     while(moreDataAvailable){
         opcode = getopcode(buffer);
         if(opcode == DATA){
-            cout <<"response : " << buffer << endl;
-
+            cout <<"response : " << buffer + 4<< endl;
         }else{
-            cout << "response : " << buffer << " opcode " << opcode << endl;
+            
             
             break;
         }
