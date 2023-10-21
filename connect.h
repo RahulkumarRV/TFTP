@@ -230,6 +230,6 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     socklen_t addrLen = sizeof(clientAddr);
     uint16_t opcode = htons(3), blocknumber = htons(1);
     pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, "rahul kumar");
-    sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+    // sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
     
 }
