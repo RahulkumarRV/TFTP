@@ -4,10 +4,19 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #include <string.h>
 using namespace std;
 
 #define MAX_PACKET_SIZE 512
+
+enum packet_type {
+    RRQ = 1,
+    WWQ,
+    DATA,
+    ACK,
+    ERROR
+}PACKET_TYPE;
 
 pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {
     // Calculate the buffer size
@@ -112,4 +121,115 @@ uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber
     data = header + headerSize;
 
     return dataLength;
+}
+
+uint16_t getopcode(char buffer[]){
+    uint16_t opcode;
+    memcpy(&opcode, buffer, sizeof(opcode));
+    return ntohs(opcode);
+}
+
+bool waitForTimeOut(int sockfd, char* buffer, struct sockaddr_in& address, int timeout) {
+    struct timeval tv;
+    tv.tv_sec = timeout / 1000;        // seconds
+    tv.tv_usec = (timeout % 1000) * 1000;  // microseconds
+    int bufferSize = sizeof(buffer);
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(sockfd, &fds);
+
+    int selectResult = select(sockfd + 1, &fds, NULL, NULL, &tv);
+
+    if (selectResult < 0) {
+        std::cerr << "select failed" << std::endl;
+        return false;
+    } else if (selectResult == 0) {
+        // Timeout
+        return false;
+    } else {
+        // Data available to read
+        socklen_t addressLen = sizeof(address);
+        int bytesReceived = recvfrom(sockfd, buffer, bufferSize, 0, (struct sockaddr*)&address, &addressLen);
+        uint16_t opcode, blocknumber;
+        char *data;
+        parse_DATA_header(buffer, opcode, blocknumber, data, bytesReceived);
+        cout << " checkt response : " << data << " opcode " << opcode << " block number " << blocknumber << " recived bytes " << bytesReceived << endl;
+        if (bytesReceived < 0) {
+            std::cerr << "recvfrom failed" << std::endl;
+            return false;
+        }
+        return true; 
+    }
+}
+
+bool waitForResponse(int sockfd, char* buffer, struct sockaddr_in& address, int timeout, int retries) {
+    
+    while(retries-- > 0) {
+        if(waitForTimeOut(sockfd, buffer, address, timeout)){
+            return true;
+        }
+        cout << "retring " << retries << endl;
+    }
+    return false;
+}
+
+void reciveData(int sockfd, char* buffer, struct sockaddr_in& address){
+    uint16_t offset = 0, number_of_bytes = 0;
+    bool moreDataAvailable = true;
+    sockaddr_in newAddress;
+    memset((char *)&address, 0, sizeof(address));
+    uint16_t opcode, errorcode, blocknumber;
+    // cout << getopcode(buffer) << " size : " << sizeof(buffer) << endl;
+    while(moreDataAvailable){
+        opcode = getopcode(buffer);
+        if(opcode == DATA){
+            cout <<"response : " << buffer << endl;
+
+        }else{
+            cout << "response : " << buffer << " opcode " << opcode << endl;
+            
+            break;
+        }
+        moreDataAvailable = false;
+    }
+}
+
+
+int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr, int sockfd) 
+{
+    int countoftry = 100;
+    int portNumber = minPort;
+    while(countoftry > 0){
+        portNumber = minPort + (rand() % (maxPort - minPort + 1));
+        addr.sin_port = htons(portNumber);
+        if(bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) == 0){
+            return portNumber;
+        }
+    }
+    return -1;
+}
+
+
+void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus) {
+    char clientIP[INET_ADDRSTRLEN]; // client IP address
+    inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
+    uint16_t clientPort = ntohs(clientAddr.sin_port); // client port
+    struct sockaddr_in myAddress;
+    int socketfd = socket(AF_INET, SOCK_DGRAM, 0);
+    memset((char *)&myAddress, 0, sizeof(myAddress));
+    myAddress.sin_family = AF_INET;
+    inet_pton(AF_INET, "127.0.0.1", &myAddress.sin_addr);
+    int myPort = generateRandomPortAndBind(5000, 6000, myAddress, socketfd);
+    if( myPort == -1) {
+        cout << "Thread not able to bind to a new port" << endl;
+        return;
+    }else{
+        cout << "Thread successfully bind to a new port " <<  myPort << " for the client " << clientIP << endl;
+    }
+    string message = "server new port address";
+    socklen_t addrLen = sizeof(clientAddr);
+    uint16_t opcode = htons(3), blocknumber = htons(1);
+    pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, "rahul kumar");
+    sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+    
 }

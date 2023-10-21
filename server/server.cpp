@@ -6,9 +6,10 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include "../connect.h"
+#include <thread>
 using namespace std;
 
-int myport = 9092;
+int myport = 69;
 uint16_t maxbuffersize = 512;
 
 int main(int argc, char **argv){
@@ -33,6 +34,7 @@ int main(int argc, char **argv){
     if(status == 0){
         cout<< "connection established"<<endl;
     }else{
+        cout << "connection failed to bind"<<endl;
         return -1;
     }
 
@@ -40,43 +42,47 @@ int main(int argc, char **argv){
 
     memset((char *) &clientAddr, 0, sizeof(clientAddr));
     
-
     char buffer[maxbuffersize]; // Adjust the buffer size accordingly
 
     while(true){
+
         // response for packet
         int receive_status = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
+
+        uint16_t opcode = getopcode(buffer);
         
-        if(receive_status < 0){
-            cerr<< "recvfrom failed"<<endl;
-            break;
+        if(opcode == 1){
+            // Create a copy of the client address, buffer, and receive_status using lambda functions
+            thread t([clientAddr, &buffer, &receive_status](){
+                handleClient(clientAddr, buffer, receive_status);
+            }); 
+            t.join();
         }
-        if(receive_status == 0){
-            cout << "connection closed"<<endl;
-            break;
-        }
-        // Extract the opcode from the received data (first 2 bytes)
-        uint16_t opcode;
-        uint16_t blocknumber;
-        char *data;
-        uint16_t data_size = parse_DATA_header(buffer, opcode, blocknumber, data, receive_status);
-        cout << "Opcode : " << opcode << endl;
-        cout << "block number : " << blocknumber << endl;
-        data[data_size] = '\0';
-        cout << "data : " << data << endl;
-        cout << "data size : " << strlen(data) << endl;
-        cout << "recived number of bytes : " << receive_status<<endl;
-        cout << "client port : " << clientAddr.sin_port<<endl;
-        if(receive_status < maxbuffersize){
-            break;
-        }
+        // if(receive_status < 0){
+        //     cerr<< "recvfrom failed"<<endl;
+        //     break;
+        // }
+        // if(receive_status == 0){
+        //     cout << "connection closed"<<endl;
+        //     break;
+        // }
+        // // Extract the opcode from the received data (first 2 bytes)
+        // uint16_t opcode;
+        // uint16_t blocknumber;
+        // char *data;
+        // uint16_t data_size = parse_DATA_header(buffer, opcode, blocknumber, data, receive_status);
+        // cout << "Opcode : " << opcode << endl;
+        // cout << "block number : " << blocknumber << endl;
+        // data[data_size] = '\0';
+        // cout << "data : " << data << endl;
+        // cout << "data size : " << strlen(data) << endl;
+        // cout << "recived number of bytes : " << receive_status<<endl;
+        // cout << "client port : " << clientAddr.sin_port<<endl;
+        // if(receive_status < maxbuffersize){
+        //     break;
+        // }
          
     }
-
-
-
-
-
 
     return 0;
 } 
