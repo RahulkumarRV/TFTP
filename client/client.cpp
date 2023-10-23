@@ -33,16 +33,16 @@ int main(int argc, char **argv) {
     string mode = "netascii";
     char *buffer;
     pair<char*, size_t> header =  create_RRQ_WRQ_header(opcode, filename, mode);
-    int trycount = 3;
+    int trycount = MAX_RETRY_REQUEST;
     // this while loop will take care if the send request is unsuccessful then it rety and wait for the timeout time for next resend until the limit of retries is reached
     while(trycount-- > 0){
         sendto(sockfd, header.first, header.second,0,  (struct sockaddr *)&serverAddr, sizeof(serverAddr));
         // delete[] header.first;
         struct packet* datapacket = waitForTimeOut(sockfd, buffer, serverAddr, 1000);
-        uint16_t blocknumber;
+        
         if(datapacket != nullptr){
             // if the server respose to the RRQ then client can start collect the data
-            reciveData(sockfd, datapacket, serverAddr);
+            reciveData(sockfd, datapacket, serverAddr, filename);
             break;
         }
     }

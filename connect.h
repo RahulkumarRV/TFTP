@@ -6,10 +6,12 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <fstream>
 using namespace std;
 
 #define MAX_PACKET_SIZE 512 // sotre the maximum packet size including the header and data 
-
+#define MAX_RETRY_REQUEST 3
+#define MAX_ITERATIONS 32768
 // use as palceholder for the type of the request packet
 enum packet_type {
     RRQ = 1,
@@ -48,6 +50,8 @@ pair<char*, size_t> create_ACK_header(uint16_t opcode, uint16_t blocknumber) {
     uint16_t size = sizeof(opcode) + sizeof(blocknumber);
     char* buffer = new char[size];
     size_t buffer_size = size;
+    opcode = htons(opcode);
+    blocknumber = htons(blocknumber);
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), &blocknumber, sizeof(blocknumber));
     return make_pair(buffer, buffer_size);
@@ -67,22 +71,25 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
 }
 
 // create the data header of the tftp, which will be contains the opcode, block number and data
-pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, string data){
+pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, char* data){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
-    if(data.length() > datasize){
+    int dataLength = strlen(data);
+    if(dataLength > datasize){
         cout << "data length exceeds 518 bytes";
         return make_pair(nullptr, -1);
     } 
+    opcode = htons(opcode);
+    blocknumber = htons(blocknumber);
     uint16_t size = sizeof(opcode) + sizeof(blocknumber);
-    size_t buffer_size = size + data.length();
 
-    char *buffer = new char[buffer_size];
+    size_t buffer_size = size + dataLength;
+    char *buffer = (char *) malloc(buffer_size);
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), &blocknumber, sizeof(blocknumber));
-    memcpy(buffer + size, data.c_str(), data.length());
+    memcpy(buffer + size, data, dataLength);
     // data is null character terminated if and only if it's size is lesser thatn 518 bytes
-    if(data.length() < datasize){
+    if(dataLength < datasize){
         buffer[buffer_size] = '\0';
     }
     return make_pair(buffer, buffer_size);
@@ -94,10 +101,17 @@ void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
 
-    // Set filename and mode pointers
-    filename = header + sizeof(opcode);
-    mode = filename + strlen(filename) + 1;
+    // Set filename pointer
+    char* char_ptr = header + sizeof(opcode);
+    filename = (char*) malloc(strlen(char_ptr) + 1);
+    strcpy(filename, char_ptr);
+
+    // Set mode pointer
+    char_ptr = filename + strlen(char_ptr) + 1;
+    mode = (char*) malloc(strlen(char_ptr) + 1);
+    strcpy(mode, char_ptr);
 }
+
 
 // parse the acknowledgment header of tftp to get the opcode and block number
 void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
@@ -108,12 +122,15 @@ void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
 }
 
 // parse the tftp header to extract the error code information 
-void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, char*& errormessage){
+void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, char*& errormessage, size_t packetSize){
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
     memcpy(&errorcode, header + sizeof(opcode), sizeof(errorcode));
     errorcode = ntohs(errorcode);
-    errormessage = header + sizeof(opcode) + sizeof(errorcode);
+    int headerSize = sizeof(opcode) + sizeof(errorcode);
+    int dataLength  = packetSize - headerSize;
+    errormessage = (char *)malloc(dataLength);
+    memcpy(errormessage, header + headerSize, dataLength);
 }
 
 // parse the tftp header to extract the opcode, block number and data 
@@ -182,26 +199,56 @@ struct packet* waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& add
 }
 
 // it handle the data coming for the requested rrq request
-void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address){
+void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
     sockaddr_in newAddress;
-    memset((char *)&address, 0, sizeof(address));
+    memset((char*)&newAddress, 0, sizeof(sockaddr_in));
+    socklen_t addrLen = sizeof(newAddress);
+    ofstream outputfile;
+    // memset((char *)&address, 0, sizeof(address));
     uint16_t opcode, errorcode, blocknumber;
     char *data;
+    int trycount = 3;
+    // open the output file with given name
+    outputfile.open(filename);
     while(moreDataAvailable){
         opcode = buffer->opcode;
-        if(opcode == DATA){
+        cout << opcode << " " << buffer->blocknumber << endl;
+        if(opcode == DATA ){
             // if the comming packet is data packet then store the data and send the ACK for this packet
-            // parse_DATA_header(buffer, opcode, blocknumber, data, MAX_PACKET_SIZE);
-            cout << "data 1 : " << buffer->data << " opcode : " << buffer->opcode << " blocknumber : " << buffer->blocknumber << " packet length :"  << buffer->packet_length << " data size : " << strlen(buffer->data) << endl;
+           
+            if(outputfile.is_open()){
+                outputfile << buffer->data ;
 
+            }else{
+                cout << "Failed to open output file" << endl;
+                return ;
+            }
         }else{
-            
+            cout << "Recived not any data packet" << endl;
             
             break;
         }
-        moreDataAvailable = false;
+
+        if(buffer->packet_length < MAX_PACKET_SIZE){
+            moreDataAvailable = false;
+            outputfile.close();
+        }else{
+            trycount = MAX_RETRY_REQUEST;
+            // create a acknowledgement packet for the currently proccesed packet
+            pair<char*, size_t> ack_packet = create_ACK_header(4, buffer->blocknumber);
+            char* newbuffer; // will remove, unneccessary
+            while(trycount-- > 0){
+                sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
+                buffer = waitForTimeOut(sockfd, newbuffer, newAddress, 1000);
+                if(buffer == nullptr){
+                    cout << "ERROR: Failed to recive packet" <<endl;
+                    return;
+                }
+            }
+        }
+
     }
 }
 
@@ -240,8 +287,36 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     }
     string message = "server new port address";
     socklen_t addrLen = sizeof(clientAddr);
-    uint16_t opcode = htons(3), blocknumber = htons(1);
-    pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, "rahul kumar");
-    sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-    
+    uint16_t opcode = 3, blocknumber = 1;
+    char* filename;
+    char* mode;
+    char databuffer[MAX_PACKET_SIZE - 4]; // data part of the packet
+    parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
+    ifstream input_file(filename);
+    if(!input_file.is_open()){
+        cout << "Error opening " << filename << endl;
+        return;
+    }
+    uint16_t iteration = 1;
+    while(iteration <= MAX_ITERATIONS && !input_file.eof()){
+        blocknumber = iteration;
+        opcode = 3;
+        input_file.read(databuffer, MAX_PACKET_SIZE - 4);
+        pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, databuffer);
+        sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+        
+        if(input_file.gcount() == MAX_PACKET_SIZE - 4){
+            sockaddr_in addr;
+            memset((char *)&addr, 0, sizeof(sockaddr_in));
+            socklen_t addrlen = sizeof(addr);
+            recvfrom(socketfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&addr, &addrlen);
+            opcode = getopcode(buffer);
+            if(opcode == ACK){
+                parse_ACK_header(buffer, opcode, blocknumber);
+            }
+        }
+        iteration++;
+    }
+
+    input_file.close();
 }

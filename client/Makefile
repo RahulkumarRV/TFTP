@@ -12,3 +12,4 @@ $(EXECUTABLE): $(SRC)
 
 clean:
 	rm -f $(EXECUTABLE)
+	rm -f *.txt
