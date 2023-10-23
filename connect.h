@@ -161,6 +161,19 @@ uint16_t getopcode(char buffer[]){
     return ntohs(opcode);
 }
 
+bool areSockAddressesEqual(const sockaddr_in& addr1, const sockaddr_in& addr2) {
+    // Compare the IP address
+    if (addr1.sin_addr.s_addr != addr2.sin_addr.s_addr) {
+        return false;
+    }
+    // Compare the port
+    if (addr1.sin_port != addr2.sin_port) {
+        return false;
+    }
+    // The addresses are the same
+    return true;
+}
+
 // wait for the response until timeout is reached
 // if response is come before the timeout then return true and pass the result in parms which pass as refrence
 // else return false
@@ -230,7 +243,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
             
             break;
         }
-
+        cout << "buffer packet size : " << buffer->packet_length << endl;
         if(buffer->packet_length < MAX_PACKET_SIZE){
             moreDataAvailable = false;
             outputfile.close();
@@ -244,12 +257,19 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                 buffer = waitForTimeOut(sockfd, newbuffer, newAddress, 1000);
                 if(buffer == nullptr){
                     cout << "ERROR: Failed to recive packet" <<endl;
-                    return;
+                }else{
+                    break;
                 }
+            }
+            if(trycount <= 0){
+                cout << "ERROR: connection broken" <<endl;
+                break;
             }
         }
 
     }
+
+    outputfile.close();
 }
 
 // genreate the random port number for the given address and bind it to the generated port number in the given range
@@ -290,7 +310,7 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     uint16_t opcode = 3, blocknumber = 1;
     char* filename;
     char* mode;
-    char databuffer[MAX_PACKET_SIZE - 4]; // data part of the packet
+    char *databuffer; // data part of the packet
     parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
     ifstream input_file(filename);
     if(!input_file.is_open()){
@@ -298,10 +318,19 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
         return;
     }
     uint16_t iteration = 1;
+    streampos currentPosition = 0;
+    input_file.seekg(0, ios::end);
+    int fileSize = input_file.tellg();
     while(iteration <= MAX_ITERATIONS && !input_file.eof()){
         blocknumber = iteration;
         opcode = 3;
-        input_file.read(databuffer, MAX_PACKET_SIZE - 4);
+        int minFileSize = min(MAX_PACKET_SIZE - 4, fileSize + 1);
+        input_file.seekg(currentPosition);  // Set the file position from the beginning
+        databuffer = (char *) malloc(minFileSize);
+        input_file.read(databuffer, minFileSize);
+        if(input_file.eof()){
+            buffer[input_file.gcount()] = '\0';
+        }
         pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, databuffer);
         sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
         
@@ -313,8 +342,18 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
             opcode = getopcode(buffer);
             if(opcode == ACK){
                 parse_ACK_header(buffer, opcode, blocknumber);
+                if(!areSockAddressesEqual(addr, clientAddr)){
+                    cout << "Packet comming from the different client address" << endl;
+                    break;
+                }
             }
+            cout << " check point 1" << endl;
+            
         }
+        currentPosition = input_file.tellg();
+        cout << "current position: " << currentPosition << endl;
+        fileSize -= input_file.gcount();
+        delete[] databuffer;
         iteration++;
     }
 
