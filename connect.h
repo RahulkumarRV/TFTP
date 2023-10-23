@@ -19,6 +19,14 @@ enum packet_type {
     ERROR
 }PACKET_TYPE;
 
+struct packet {
+    uint16_t opcode;
+    uint16_t error_code;
+    uint16_t blocknumber;
+    char *data;
+    uint16_t packet_length;
+};
+
 // create the rrq or wrq header which will contains the opcode, file name and mode of transfer
 pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {
     // Calculate the buffer size
@@ -123,7 +131,8 @@ uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber
     size_t dataLength = packetSize - headerSize;
 
     // Set the data pointer
-    data = header + headerSize;
+    data = (char *)malloc(dataLength);
+    memcpy(data, header + headerSize, dataLength);
 
     return dataLength;
 }
@@ -138,7 +147,7 @@ uint16_t getopcode(char buffer[]){
 // wait for the response until timeout is reached
 // if response is come before the timeout then return true and pass the result in parms which pass as refrence
 // else return false
-bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout) {
+struct packet* waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;        // seconds
     tv.tv_usec = (timeout % 1000) * 1000;  // microseconds
@@ -151,30 +160,29 @@ bool waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int 
 
     if (selectResult < 0) {
         std::cerr << "select failed" << std::endl;
-        return false;
+        return nullptr;
     } else if (selectResult == 0) {
         // Timeout
-        return false;
+        return nullptr;
     } else {
         // Data available to read
         char databuffer[MAX_PACKET_SIZE];
         socklen_t addressLen = sizeof(address);
-        int bytesReceived = recvfrom(sockfd, databuffer, sizeof(databuffer), 0, (struct sockaddr*)&address, &addressLen);
-        uint16_t opcode, blocknumber;
-        char *data;
-        buffer = databuffer;
-        parse_DATA_header(databuffer, opcode, blocknumber, data, bytesReceived);
-        cout << "data : " << data << " opcode : " << opcode << " blocknumber : " << blocknumber << endl;
+        int bytesReceived = recvfrom(sockfd, databuffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)&address, &addressLen);
+        struct packet *newPacket = (struct packet*) malloc(sizeof(struct packet));
+        parse_DATA_header(databuffer, newPacket->opcode, newPacket->blocknumber, newPacket->data, bytesReceived);
+        newPacket->packet_length = bytesReceived;
+        // cout<< newPacket->data << " data size : " << strlen(newPacket->data) << endl;
         if (bytesReceived < 0) {
             std::cerr << "recvfrom failed" << std::endl;
-            return false;
+            return nullptr;
         }
-        return true; 
+        return newPacket; 
     }
 }
 
 // it handle the data coming for the requested rrq request
-void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
+void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
     sockaddr_in newAddress;
@@ -182,11 +190,11 @@ void reciveData(int sockfd, char*& buffer, struct sockaddr_in& address){
     uint16_t opcode, errorcode, blocknumber;
     char *data;
     while(moreDataAvailable){
-        opcode = getopcode(buffer);
+        opcode = buffer->opcode;
         if(opcode == DATA){
             // if the comming packet is data packet then store the data and send the ACK for this packet
-            parse_DATA_header(buffer, opcode, blocknumber, data, MAX_PACKET_SIZE);
-            cout << "data 1 : " << data << " opcode : " << opcode << " blocknumber : " << blocknumber << endl;
+            // parse_DATA_header(buffer, opcode, blocknumber, data, MAX_PACKET_SIZE);
+            cout << "data 1 : " << buffer->data << " opcode : " << buffer->opcode << " blocknumber : " << buffer->blocknumber << " packet length :"  << buffer->packet_length << " data size : " << strlen(buffer->data) << endl;
 
         }else{
             
