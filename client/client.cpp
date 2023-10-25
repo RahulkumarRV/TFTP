@@ -9,7 +9,7 @@
 using namespace std;
 
 int serverport = 69;
-uint16_t maxbuffersize = 512;
+uint16_t maxbuffersize = 516;
 
 int main(int argc, char **argv) {
     int sockfd;

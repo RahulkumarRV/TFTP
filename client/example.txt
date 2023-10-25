@@ -1,1 +1,13 @@
-Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, "Lorem ipsum dolor sit amet..", comes from a line in section 1.10.32.
+I apologize for the confusion. The issue you're facing seems to be related to the specific Prolog system you're using, and it might not support the initialization/2 directive in the way SWI-Prolog does.
+
+To work around this issue, you can move the test_type_checking predicate call outside of the initialization/2 directive and run it directly in your Prolog interpreter. For example:
+
+Comment out the :- initialization(test_type_checking, main). line.
+
+Save your Prolog program without that line.
+
+Open your Prolog interpreter (SWI-Prolog or another) and consult the saved Prolog program.
+
+After consulting the program, manually call test_type_checking. in the interpreter.
+
+This should execute your tests without encountering the "procedure `(A:-B)' does not exist" error.

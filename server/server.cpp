@@ -10,7 +10,7 @@
 using namespace std;
 
 int myport = 69;
-uint16_t maxbuffersize = 512;
+uint16_t maxbuffersize = 516;
 
 int main(int argc, char **argv){
     
@@ -55,6 +55,7 @@ int main(int argc, char **argv){
             }); 
             t.join();
         }
+        cout << " Thread finished" << endl;
     }
 
     return 0;

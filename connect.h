@@ -9,7 +9,7 @@
 #include <fstream>
 using namespace std;
 
-#define MAX_PACKET_SIZE 512 // sotre the maximum packet size including the header and data 
+#define MAX_PACKET_SIZE 516 // sotre the maximum packet size including the header and data 
 #define MAX_RETRY_REQUEST 3
 #define MAX_ITERATIONS 32768
 // use as palceholder for the type of the request packet
@@ -333,13 +333,14 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
         }
         pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, databuffer);
         sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-        
-        if(input_file.gcount() == MAX_PACKET_SIZE - 4){
+        cout << " print Bytes sent: " << packet.second << endl;
+        // if(input_file.gcount() == MAX_PACKET_SIZE - 4){
             sockaddr_in addr;
             memset((char *)&addr, 0, sizeof(sockaddr_in));
             socklen_t addrlen = sizeof(addr);
             recvfrom(socketfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&addr, &addrlen);
             opcode = getopcode(buffer);
+            cout << " Print Opcode : " << opcode << endl;
             if(opcode == ACK){
                 parse_ACK_header(buffer, opcode, blocknumber);
                 if(!areSockAddressesEqual(addr, clientAddr)){
@@ -347,15 +348,14 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
                     break;
                 }
             }
-            cout << " check point 1" << endl;
             
-        }
+        // }
         currentPosition = input_file.tellg();
         cout << "current position: " << currentPosition << endl;
         fileSize -= input_file.gcount();
-        delete[] databuffer;
+        // free(databuffer);
         iteration++;
     }
-
+    
     input_file.close();
 }
