@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fstream>
+#include <unordered_map>
 using namespace std;
 
 #define MAX_PACKET_SIZE 516 // sotre the maximum packet size including the header and data 
@@ -20,6 +21,18 @@ enum packet_type {
     ACK,
     ERROR
 }PACKET_TYPE;
+
+// store the error code with it's message
+unordered_map<int, string> errorCodes = {
+        {0, "Not defined, see error message (if any)."},
+        {1, "File not found."},
+        {2, "Access violation."},
+        {3, "Disk full or allocation exceeded."},
+        {4, "Illegal TFTP operation."},
+        {5, "Unknown transfer ID."},
+        {6, "File already exists."},
+        {7, "No such user."}
+    };
 
 struct packet {
     uint16_t opcode;
@@ -161,6 +174,12 @@ uint16_t getopcode(char buffer[]){
     return ntohs(opcode);
 }
 
+void sendError(int code, string message, int socketfd, const sockaddr_in addr){
+    pair<char*, size_t> errorpacket = create_ERROR_header(ERROR, code, message);
+    sendto(socketfd, errorpacket.first, errorpacket.second, 0, (struct sockaddr *)&addr, sizeof(addr));
+}
+
+// check the address's are equal by IP and socket address
 bool areSockAddressesEqual(const sockaddr_in& addr1, const sockaddr_in& addr2) {
     // Compare the IP address
     if (addr1.sin_addr.s_addr != addr2.sin_addr.s_addr) {
@@ -314,7 +333,7 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
     ifstream input_file(filename);
     if(!input_file.is_open()){
-        cout << "Error opening " << filename << endl;
+        sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it
         return;
     }
     uint16_t iteration = 1;
@@ -333,14 +352,12 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
         }
         pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, databuffer);
         sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-        cout << " print Bytes sent: " << packet.second << endl;
         // if(input_file.gcount() == MAX_PACKET_SIZE - 4){
             sockaddr_in addr;
             memset((char *)&addr, 0, sizeof(sockaddr_in));
             socklen_t addrlen = sizeof(addr);
             recvfrom(socketfd, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr *)&addr, &addrlen);
             opcode = getopcode(buffer);
-            cout << " Print Opcode : " << opcode << endl;
             if(opcode == ACK){
                 parse_ACK_header(buffer, opcode, blocknumber);
                 if(!areSockAddressesEqual(addr, clientAddr)){
