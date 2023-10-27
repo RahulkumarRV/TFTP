@@ -48,11 +48,18 @@ int main(int argc, char **argv){
         // response for packet
         int receive_status = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
         uint16_t opcode = getopcode(buffer);
-        if(opcode == 1){
+        cout << buffer + sizeof(uint16_t) << endl;
+        if(opcode == RRQ){
             // Create a copy of the client address, buffer, and receive_status using lambda functions
             thread t([clientAddr, &buffer, &receive_status](){
-                handleClient(clientAddr, buffer, receive_status);
+                handleClient(clientAddr, buffer + sizeof(uint16_t), receive_status);
             }); 
+            t.join();
+        }else if(opcode == WRQ){
+            // handle the client to write data on the server
+            thread t([clientAddr, &buffer, &receive_status](){
+                handleClientToWriteFileOnServer(clientAddr, buffer, receive_status);
+            });
             t.join();
         }
         cout << " Thread finished" << endl;

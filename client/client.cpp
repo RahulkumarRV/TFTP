@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     // Create an RRQ packet
-    uint16_t opcode = htons(1); // Opcode for RRQ
+    uint16_t opcode = htons(RRQ); // Opcode for RRQ
     string filename = "example.txt";
     string mode = "netascii";
     char *buffer;
@@ -39,12 +39,22 @@ int main(int argc, char **argv) {
         sendto(sockfd, header.first, header.second,0,  (struct sockaddr *)&serverAddr, sizeof(serverAddr));
         // delete[] header.first;
         struct packet* datapacket = waitForTimeOut(sockfd, buffer, serverAddr, 1000);
-        
-        if(datapacket != nullptr){
+        // char* header = creat
+        if(datapacket != nullptr) {
             // if the server respose to the RRQ then client can start collect the data
-            reciveData(sockfd, datapacket, serverAddr, filename);
+            if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
+            // if server send the ACK and i first send write request it means server ready to connect for writing file
+            else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
+                handleClient(serverAddr, "example.txt", MAX_PACKET_SIZE);
+            }
             break;
         }
+    }
+
+    // if trycount is 0 then it mean connection not working or disconnected
+    if(trycount <= 0){
+        cout << "Connection not working" << endl;
+        return 0;
     }
     
 

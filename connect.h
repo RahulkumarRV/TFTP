@@ -16,7 +16,7 @@ using namespace std;
 // use as palceholder for the type of the request packet
 enum packet_type {
     RRQ = 1,
-    WWQ,
+    WRQ,
     DATA,
     ACK,
     ERROR
@@ -174,6 +174,8 @@ uint16_t getopcode(char buffer[]){
     return ntohs(opcode);
 }
 
+
+
 void sendError(int code, string message, int socketfd, const sockaddr_in addr){
     pair<char*, size_t> errorpacket = create_ERROR_header(ERROR, code, message);
     sendto(socketfd, errorpacket.first, errorpacket.second, 0, (struct sockaddr *)&addr, sizeof(addr));
@@ -308,7 +310,7 @@ int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr
 
 // this code used by the server to handle the client 
 // it also make connection to then new port number the comming client to communicate futher
-void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus) {
+void handleClient(struct sockaddr_in clientAddr, const char* filename, int receiveStatus) {
     char clientIP[INET_ADDRSTRLEN]; // client IP address
     inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
     uint16_t clientPort = ntohs(clientAddr.sin_port); // client port
@@ -327,10 +329,8 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     string message = "server new port address";
     socklen_t addrLen = sizeof(clientAddr);
     uint16_t opcode = 3, blocknumber = 1;
-    char* filename;
-    char* mode;
-    char *databuffer; // data part of the packet
-    parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
+    char* databuffer, *buffer = (char*)malloc(MAX_PACKET_SIZE);
+    // parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
     ifstream input_file(filename);
     if(!input_file.is_open()){
         sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it
@@ -348,7 +348,7 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
         databuffer = (char *) malloc(minFileSize);
         input_file.read(databuffer, minFileSize);
         if(input_file.eof()){
-            buffer[input_file.gcount()] = '\0';
+            databuffer[input_file.gcount()] = '\0';
         }
         pair<char*, size_t> packet = create_DATA_header(opcode, blocknumber, databuffer);
         sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
@@ -375,4 +375,45 @@ void handleClient(struct sockaddr_in clientAddr, char* buffer, int receiveStatus
     }
     
     input_file.close();
+}
+
+
+void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer, int packetLength){
+    // setup the new connection for client 
+    struct sockaddr_in myAddress;
+    int socketfd = socket(AF_INET, SOCK_DGRAM, 0);
+    memset((char *)&myAddress, 0, sizeof(myAddress));
+    myAddress.sin_family = AF_INET;
+    inet_pton(AF_INET, "127.0.0.1", &myAddress.sin_addr);
+    int myPort = generateRandomPortAndBind(5000, 6000, myAddress, socketfd);
+    if( myPort == -1) {
+        cout << "Thread not able to bind to a new port" << endl;
+        return;
+    }else{
+        cout << "Thread successfully bind to a new port ";
+    }
+    // extract the file name from the packet
+    uint16_t opcode; char* filename, *mode;
+    parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
+
+    // create the acknowledgement packet to send to client for the WRQ
+    pair<char*, size_t> ack_packet = create_ACK_header(ACK, 0);
+    char* newbuffer; // will remove, unneccessary
+    struct packet* datapacket;
+    int trycount = MAX_RETRY_REQUEST;
+    while(trycount-- > 0){
+        sendto(socketfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+        datapacket = waitForTimeOut(socketfd, newbuffer, myAddress, 1000);
+        if(datapacket == nullptr){
+            cout << "ERROR: Failed to recive packet" <<endl;
+        }else{
+            // client responsed back to server, this response should contains the data packet for server to write
+            reciveData(socketfd, datapacket, clientAddr, filename);
+        }
+    }
+    // if connection is disconnected
+    if(trycount <= 0){
+        cout << "ERROR: connection broken" <<endl;
+    }
+
 }

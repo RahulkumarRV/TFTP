@@ -1,30 +1,11 @@
-The TFTP "get" command is used to retrieve a file from a TFTP server. When you execute the "get filename" command, a sequence of operations is performed to transfer the file from the server to your local machine. Here is a high-level overview of the sequence of operations for a TFTP "get" command:
+Unhandled Exception: This error often occurs when an exception is thrown in your C++ code, but there is no associated try-catch block to catch the exception and handle it. As a result, the program terminates unexpectedly.
 
-Client Sends RRQ (Read Request):
+To resolve this, make sure to use try-catch blocks to catch and handle exceptions that may be thrown within your code.
 
-The client (your local machine) sends a Read Request (RRQ) packet to the TFTP server.
-The RRQ packet includes the filename of the file you want to retrieve ("filename").
-Server Responds with DATA or ERROR:
+Out-of-Memory: In some cases, this error can occur when your program runs out of memory (e.g., due to excessive memory allocation) and the new operator is unable to allocate memory.
 
-The TFTP server receives the RRQ packet and checks if the requested file ("filename") exists.
-If the file exists and the server has permission to access it, the server responds with a DATA packet.
-If the file does not exist or there is an error, the server responds with an ERROR packet.
-Client Acknowledges DATA Packets:
+To address this, ensure that you are properly managing memory in your program and that you release memory when it's no longer needed. Also, consider optimizing memory usage.
 
-If the server responds with a DATA packet, the client acknowledges each DATA packet.
-The client receives a block of data and sends an acknowledgment (ACK) packet back to the server.
-Data Transfer:
+Incompatibility or Library Issue: Sometimes, this error can be related to compatibility issues between libraries or an issue with the C++ runtime. It can be caused by using incompatible versions of libraries or making certain calls that the system cannot handle.
 
-The server continues to send DATA packets, and the client acknowledges them.
-This process continues until the entire file has been transferred.
-Client Saves the File Locally:
-
-As the client receives data blocks, it writes them to a local file on your machine with the specified filename.
-End of Transfer:
-
-When the server has sent all the data blocks, it sends an empty DATA packet to indicate the end of the transfer.
-The client acknowledges this final packet.
-Transfer Complete:
-
-The client displays a message indicating that the file transfer is complete.
-Please note that TFTP is a very simple protocol and does not provide features like authentication or encryption. It is often used for basic file transfers on local networks or in scenarios where simplicity and speed are more important than security. The exact details of the protocol may vary depending on the TFTP server and client implementations used.
+To resolve this, ensure that you are using compatible libraries and that you are using the correct functions or API calls.
