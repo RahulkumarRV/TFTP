@@ -41,11 +41,20 @@ int main(int argc, char **argv) {
         struct packet* datapacket = waitForTimeOut(sockfd, buffer, serverAddr, 1000);
         // char* header = creat
         if(datapacket != nullptr) {
-            // if the server respose to the RRQ then client can start collect the data
+            // if the server respose to the RRQ as data packet then client can start collect the data
             if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
-            // if server send the ACK and i first send write request it means server ready to connect for writing file
+            // if server send the ACK and i first send write request it means server ready to connect for collecting file data
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
                 handleServer(serverAddr, "example.txt", sockfd);
+            }
+            // server send the error packet then shout down this connection
+            else if(datapacket->opcode == ERROR){
+                cout << "[ERROR] " << datapacket->data << endl;
+                return -1;
+            }
+            else {
+                sendError( 4, errorCodes[4], sockfd, serverAddr);
+                cout << "[ERROR] " << errorCodes[4] << endl;
             }
             break;
         }

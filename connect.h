@@ -75,6 +75,8 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
     uint16_t size = sizeof(opcode) + sizeof(errorcode);
     size_t buffer_size = size + errormessage.length() + 1;
     char *buffer = new char[buffer_size];
+    opcode = htons(opcode);
+    errorcode = htons(errorcode);
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), &errorcode, sizeof(errorcode));
     memcpy(buffer + size, errormessage.c_str(), errormessage.length());
@@ -221,6 +223,7 @@ struct packet* waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& add
         socklen_t addressLen = sizeof(address);
         int bytesReceived = recvfrom(sockfd, databuffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)&address, &addressLen);
         struct packet *newPacket = (struct packet*) malloc(sizeof(struct packet));
+        // block number will be as error code if the opcode is ERROR and error message is data
         parse_DATA_header(databuffer, newPacket->opcode, newPacket->blocknumber, newPacket->data, bytesReceived);
         newPacket->packet_length = bytesReceived;
         // cout<< newPacket->data << " data size : " << strlen(newPacket->data) << endl;
@@ -268,10 +271,12 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         if(buffer->packet_length < MAX_PACKET_SIZE){
             moreDataAvailable = false;
             outputfile.close();
+            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
+            sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
         }else{
             trycount = MAX_RETRY_REQUEST;
             // create a acknowledgement packet for the currently proccesed packet
-            pair<char*, size_t> ack_packet = create_ACK_header(4, buffer->blocknumber);
+            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
             char* newbuffer; // will remove, unneccessary
             while(trycount-- > 0){
                 sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
@@ -283,7 +288,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                 }
             }
             if(trycount <= 0){
-                cout << "ERROR: connection broken" <<endl;
+                cout << "[ERROR] Timeout occurred." <<endl;
                 break;
             }
         }
@@ -292,6 +297,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
 
     outputfile.close();
 }
+
 
 // genreate the random port number for the given address and bind it to the generated port number in the given range
 int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr, int sockfd) 
@@ -377,7 +383,7 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, int recei
     input_file.close();
 }
 
-
+// this function used by server when client wants to write a file on the server disk
 void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer, int packetLength){
     // setup the new connection for client 
     struct sockaddr_in myAddress;
@@ -398,22 +404,23 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
 
     // create the acknowledgement packet to send to client for the WRQ
     pair<char*, size_t> ack_packet = create_ACK_header(ACK, 0);
+    
     char* newbuffer; // will remove, unneccessary
     struct packet* datapacket;
     int trycount = MAX_RETRY_REQUEST;
     while(trycount-- > 0){
         sendto(socketfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
         datapacket = waitForTimeOut(socketfd, newbuffer, myAddress, 1000);
-        if(datapacket == nullptr){
-            cout << "ERROR: Failed to recive packet" <<endl;
-        }else{
-            // client responsed back to server, this response should contains the data packet for server to write
-            reciveData(socketfd, datapacket, clientAddr, filename);
+        if(datapacket != nullptr){
+            break;
         }
     }
     // if connection is disconnected
     if(trycount <= 0){
-        cout << "ERROR: connection broken" <<endl;
+        cout << "[ERROR] Timeout occurred." <<endl;
+        return;
+    }else{
+        reciveData(socketfd, datapacket, clientAddr, filename);
     }
 
 }
@@ -452,13 +459,14 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
         while(trycount-- > 0){
             memset((char *)&addr, 0, sizeof(sockaddr_in));
             // socklen_t addrlen = sizeof(addr);
-            pair<char*, size_t> packet = create_DATA_header(DATA, 1, databuffer);
+            pair<char*, size_t> packet = create_DATA_header(DATA, blocknumber, databuffer);
             sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
             responsepacket = waitForTimeOut(socketfd, buffer, addr, 1000);
             if(responsepacket != nullptr) break;
         }
         // if timeout occured then close file and terminate the connection
         if(trycount <= 0){
+            cout << "[ERROR] Timeout occurred." <<endl;
             input_file.close();
             return;
         }
