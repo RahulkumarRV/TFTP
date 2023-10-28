@@ -259,8 +259,20 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                 outputfile << buffer->data ;
 
             }else{
-                cout << "Failed to open output file" << endl;
-                return ;
+                // fail to open the file due to file not exist
+                if(outputfile.rdstate() && ios_base::failbit){
+                    sendError( 1, errorCodes[1], sockfd, address);
+                    cout << "File not found"<<endl;
+                }
+                // // fail to open the file not have sufficient permissions
+                // if(outputfile.rdstate() && ios_base::permission_denied){
+                //     cout << "Permission denied"<<endl;
+                // }
+                // // fail to open the file becouse it already in use
+                // if(outputfile.rdstate() && ios_base::in_use){
+                //     cout << "File already in use"<<endl;
+                // }
+                return;
             }
         }else{
             cout << "Recived not any data packet" << endl;
@@ -415,7 +427,8 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
             break;
         }
     }
-    // if connection is disconnected
+    // if connection is disconnected simply close the connection
+    // not send the error message becouse if timeout occurs of the previous packet then may be timeout also occure for the error packet 
     if(trycount <= 0){
         cout << "[ERROR] Timeout occurred." <<endl;
         return;
