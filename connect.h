@@ -417,3 +417,73 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
     }
 
 }
+
+// handle server to send file from the client to the server
+void handleServer(struct sockaddr_in serverAddr, const char* filename, int socketfd){
+    uint16_t server_port = ntohs(serverAddr.sin_port);
+    socklen_t addrLen = sizeof(serverAddr);
+    char* databuffer, *buffer = (char *)malloc(MAX_PACKET_SIZE);
+    ifstream input_file(filename);
+    if(!input_file.is_open()){
+        sendError(1, errorCodes[1], socketfd, serverAddr);
+        return;
+    } 
+    uint16_t virusPacket = 10;
+    uint16_t iteration = 1;
+    streampos currentPosition = 0;
+    input_file.seekg(0, ios::end);
+    int fileSize = input_file.tellg();
+    int trycount;
+    sockaddr_in addr;
+    struct packet* responsepacket;
+    uint16_t opcode = DATA, blocknumber = 1;
+
+    while(iteration <= MAX_ITERATIONS && !input_file.eof()){
+
+        int minFileSize = min(MAX_PACKET_SIZE - 4, fileSize + 1);
+        input_file.seekg(currentPosition);
+        databuffer = (char *) malloc(minFileSize);
+        input_file.read(databuffer, minFileSize);
+        if(input_file.eof()){
+            databuffer[input_file.gcount()] = '\0';
+        }
+        // check timeout for the paket sended
+        trycount = MAX_RETRY_REQUEST;
+        while(trycount-- > 0){
+            memset((char *)&addr, 0, sizeof(sockaddr_in));
+            // socklen_t addrlen = sizeof(addr);
+            pair<char*, size_t> packet = create_DATA_header(DATA, 1, databuffer);
+            sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+            responsepacket = waitForTimeOut(socketfd, buffer, addr, 1000);
+            if(responsepacket != nullptr) break;
+        }
+        // if timeout occured then close file and terminate the connection
+        if(trycount <= 0){
+            input_file.close();
+            return;
+        }
+        // the the response packet comes
+        if(responsepacket->opcode == ACK){
+            if(!areSockAddressesEqual(addr, serverAddr)){
+                virusPacket--;
+                if(virusPacket <=0){
+                    input_file.close();
+                    return;
+                }
+                cout<< "packet commming from the different addresses"<< endl;
+                
+            }else{
+                currentPosition = input_file.tellg();
+                cout << "current position: " << currentPosition << endl;
+                fileSize -= input_file.gcount();
+                // free(databuffer);
+                iteration++;
+                blocknumber++;
+            }
+        }
+        else if(responsepacket->opcode == ERROR){
+            cout << "ERROR packet come from the other side" << endl;
+        }
+    }
+    input_file.close();
+}

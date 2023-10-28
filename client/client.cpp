@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     // Create an RRQ packet
-    uint16_t opcode = htons(RRQ); // Opcode for RRQ
+    uint16_t opcode = htons(WRQ); // Opcode for RRQ
     string filename = "example.txt";
     string mode = "netascii";
     char *buffer;
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
             if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
             // if server send the ACK and i first send write request it means server ready to connect for writing file
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
-                handleClient(serverAddr, "example.txt", MAX_PACKET_SIZE);
+                handleServer(serverAddr, "example.txt", sockfd);
             }
             break;
         }
@@ -57,7 +57,6 @@ int main(int argc, char **argv) {
         return 0;
     }
     
-
 
 
 
