@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fstream>
+#include <filesystem>
 #include <unordered_map>
 using namespace std;
 
@@ -247,6 +248,13 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     uint16_t opcode, errorcode, blocknumber;
     char *data;
     int trycount = 3;
+    if (filesystem::exists(filename)) {
+        cout << "File " << filename << " already exists" << endl;
+        sendError(6, errorCodes[6], sockfd, address);
+        return;
+    }else{
+        cout << "File " << filename << " not already exists" << endl;
+    }
     // open the output file with given name
     outputfile.open(filename);
     while(moreDataAvailable){
@@ -254,9 +262,8 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         cout << opcode << " " << buffer->blocknumber << endl;
         if(opcode == DATA ){
             // if the comming packet is data packet then store the data and send the ACK for this packet
-           
             if(outputfile.is_open()){
-                outputfile << buffer->data ;
+                outputfile << buffer->data;
 
             }else{
                 // fail to open the file due to file not exist
@@ -264,14 +271,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                     sendError( 1, errorCodes[1], sockfd, address);
                     cout << "File not found"<<endl;
                 }
-                // // fail to open the file not have sufficient permissions
-                // if(outputfile.rdstate() && ios_base::permission_denied){
-                //     cout << "Permission denied"<<endl;
-                // }
-                // // fail to open the file becouse it already in use
-                // if(outputfile.rdstate() && ios_base::in_use){
-                //     cout << "File already in use"<<endl;
-                // }
                 return;
             }
         }else{
