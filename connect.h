@@ -377,7 +377,9 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, int recei
             opcode = getopcode(buffer);
             if(opcode == ACK){
                 parse_ACK_header(buffer, opcode, blocknumber);
+                // if response comming from the other end point other than expected end point
                 if(!areSockAddressesEqual(addr, clientAddr)){
+                    sendError(5, errorCodes[5], socketfd, clientAddr);
                     cout << "Packet comming from the different client address" << endl;
                     break;
                 }
@@ -482,14 +484,16 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
             input_file.close();
             return;
         }
-        // the the response packet comes
+        // the the response packet comes 
         if(responsepacket->opcode == ACK){
+            // end packet come from the different end point other than expected end point
             if(!areSockAddressesEqual(addr, serverAddr)){
                 virusPacket--;
                 if(virusPacket <=0){
                     input_file.close();
                     return;
                 }
+                sendError(5, errorCodes[5], socketfd, serverAddr);
                 cout<< "packet commming from the different addresses"<< endl;
                 
             }else{
