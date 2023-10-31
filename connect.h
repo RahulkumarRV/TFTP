@@ -252,8 +252,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         cout << "File " << filename << " already exists" << endl;
         sendError(6, errorCodes[6], sockfd, address);
         return;
-    }else{
-        cout << "File " << filename << " not already exists" << endl;
     }
     // open the output file with given name
     outputfile.open(filename);
@@ -274,9 +272,15 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                 return;
             }
         }else{
-            cout << "Recived not any data packet" << endl;
-            
-            break;
+            // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
+            if(buffer->opcode == ACK){
+                continue;
+            }
+            // recived the error packet so print and terminate connection
+            else{
+                cout <<"[ERROR] " << buffer->data << endl;
+                break;
+            }
         }
         cout << "buffer packet size : " << buffer->packet_length << endl;
         if(buffer->packet_length < MAX_PACKET_SIZE){
@@ -476,7 +480,11 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
             pair<char*, size_t> packet = create_DATA_header(DATA, blocknumber, databuffer);
             sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
             responsepacket = waitForTimeOut(socketfd, buffer, addr, 1000);
-            if(responsepacket != nullptr) break;
+            if(responsepacket != nullptr && responsepacket->blocknumber < blocknumber) {
+                trycount++;
+            }else if (responsepacket != nullptr && (responsepacket->blocknumber == blocknumber || responsepacket->opcode == ERROR)){
+                break;
+            }
         }
         // if timeout occured then close file and terminate the connection
         if(trycount <= 0){
@@ -506,7 +514,8 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
             }
         }
         else if(responsepacket->opcode == ERROR){
-            cout << "ERROR packet come from the other side" << endl;
+            cout << "[ERROR] " << responsepacket->data << endl;
+            return;
         }
     }
     input_file.close();
