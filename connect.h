@@ -9,7 +9,9 @@
 #include <fstream>
 #include <filesystem>
 #include <unordered_map>
+#include <unordered_set>
 using namespace std;
+namespace fs = std::filesystem;
 
 #define MAX_PACKET_SIZE 516 // sotre the maximum packet size including the header and data 
 #define MAX_RETRY_REQUEST 3
@@ -20,7 +22,8 @@ enum packet_type {
     WRQ,
     DATA,
     ACK,
-    ERROR
+    ERROR,
+    DIR
 }PACKET_TYPE;
 
 // store the error code with it's message
@@ -42,6 +45,74 @@ struct packet {
     char *data;
     uint16_t packet_length;
 };
+
+
+// create directory structure start
+
+string getFileOrDirName(string path){
+    string result = "";
+    int i = path.length() - 1;
+    while(i >= 0  && path[i] != '/'){
+        result = path[i] + result;
+        i--;
+    }
+    return result;
+}
+
+// create directory structure in the file directory_structure.txt
+void listAllDirectories(uint16_t depth, string path, const unordered_set<string> ignorePaths, ofstream& directory_structure){
+    if(fs::exists(path) && fs::is_directory(path)){
+        for(auto& entry: fs::directory_iterator(path)){
+            if(ignorePaths.find(entry.path().string()) == ignorePaths.end()){
+                for(int i = 1; i <= depth; i++) directory_structure << "    ";
+                directory_structure << "|-  ";
+                directory_structure  << getFileOrDirName(entry.path().string()) << endl;
+                if(fs::is_directory(entry.path())){
+                    listAllDirectories(depth + 1, entry.path().string(), ignorePaths, directory_structure);
+                }
+            }
+        }
+    }
+}
+
+void createDirectoryStructure(string path, const unordered_set<string> ignorePaths){
+    ofstream directory_structure("directory_structure.txt");
+    listAllDirectories(0, path, ignorePaths, directory_structure);
+    directory_structure.close();
+}
+
+std::string trimNewline(const std::string& str, char toTrim) {
+    // Trim newline character from the end of the string
+    if (!str.empty() && str[str.length()] == toTrim) {
+        return str.substr(0, str.length() - 1);
+    }
+    return str;
+}
+
+// if the return emtpy list means may be the file .ignore file does not exist
+// else return the list of directories and the files to ignore
+std::unordered_set<std::string> readNamesOfIgnoreFiles() {
+    std::unordered_set<std::string> names;
+    std::ifstream file(".ignore");
+    if (file.is_open()) {
+        std::string name;
+        while (!file.eof()) {
+            std::getline(file, name);
+            if(!file.eof())
+                names.insert(trimNewline(name, '\0'));
+            else names.insert(name);
+        }
+        file.close();
+    }
+    return names;
+}
+
+void generateDirectory(string path){
+    unordered_set<string> paths = readNamesOfIgnoreFiles();
+    createDirectoryStructure(path, paths);
+}
+
+// create directory structure end
 
 // create the rrq or wrq header which will contains the opcode, file name and mode of transfer
 pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {
@@ -249,7 +320,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     char *data;
     int trycount = 3;
     if (filesystem::exists(filename)) {
-        cout << "File " << filename << " already exists" << endl;
         sendError(6, errorCodes[6], sockfd, address);
         return;
     }
@@ -313,6 +383,83 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     outputfile.close();
 }
 
+void reciveDirectoryData(int sockfd, struct packet*& buffer, struct sockaddr_in& address){
+    uint16_t offset = 0, number_of_bytes = 0;
+    bool moreDataAvailable = true;
+    sockaddr_in newAddress;
+    memset((char*)&newAddress, 0, sizeof(sockaddr_in));
+    socklen_t addrLen = sizeof(newAddress);
+    // ofstream outputfile;
+    // memset((char *)&address, 0, sizeof(address));
+    uint16_t opcode, errorcode, blocknumber;
+    char *data;
+    int trycount = 3;
+    // if (filesystem::exists(filename)) {
+    //     cout << "File " << filename << " already exists" << endl;
+    //     sendError(6, errorCodes[6], sockfd, address);
+    //     return;
+    // }
+    // // open the output file with given name
+    // outputfile.open(filename);
+    while(moreDataAvailable){
+        opcode = buffer->opcode;
+        cout << opcode << " " << buffer->blocknumber << endl;
+        if(opcode == DATA ){
+            // if the comming packet is data packet then store the data and send the ACK for this packet
+            // if(outputfile.is_open()){
+            //     outputfile << buffer->data;
+
+            // }else{
+            //     // fail to open the file due to file not exist
+            //     if(outputfile.rdstate() && ios_base::failbit){
+            //         sendError( 1, errorCodes[1], sockfd, address);
+            //         cout << "File not found"<<endl;
+            //     }
+            //     return;
+            // }
+            cout << buffer->data;
+        }else{
+            // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
+            if(buffer->opcode == ACK){
+                continue;
+            }
+            // recived the error packet so print and terminate connection
+            else{
+                cout <<"[ERROR] " << buffer->data << endl;
+                break;
+            }
+        }
+        cout << "buffer packet size : " << buffer->packet_length << endl;
+        if(buffer->packet_length < MAX_PACKET_SIZE){
+            moreDataAvailable = false;
+            // outputfile.close();
+            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
+            sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
+        }else{
+            trycount = MAX_RETRY_REQUEST;
+            // create a acknowledgement packet for the currently proccesed packet
+            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
+            char* newbuffer; // will remove, unneccessary
+            while(trycount-- > 0){
+                sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
+                buffer = waitForTimeOut(sockfd, newbuffer, newAddress, 1000);
+                if(buffer == nullptr){
+                    cout << "ERROR: Failed to recive packet" <<endl;
+                }else{
+                    break;
+                }
+            }
+            if(trycount <= 0){
+                cout << "[ERROR] Timeout occurred." <<endl;
+                break;
+            }
+        }
+
+    }
+
+    // outputfile.close();
+}
+
 
 // genreate the random port number for the given address and bind it to the generated port number in the given range
 int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr, int sockfd) 
@@ -331,7 +478,7 @@ int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr
 
 // this code used by the server to handle the client 
 // it also make connection to then new port number the comming client to communicate futher
-void handleClient(struct sockaddr_in clientAddr, const char* filename, int receiveStatus) {
+void handleClient(struct sockaddr_in clientAddr, const char* filename, uint16_t _opcode, int receiveStatus) {
     char clientIP[INET_ADDRSTRLEN]; // client IP address
     inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
     uint16_t clientPort = ntohs(clientAddr.sin_port); // client port
@@ -352,7 +499,14 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, int recei
     uint16_t opcode = 3, blocknumber = 1;
     char* databuffer, *buffer = (char*)malloc(MAX_PACKET_SIZE);
     // parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
-    ifstream input_file(filename);
+    if(_opcode == DIR){
+        if(fs::exists(filename)) generateDirectory(filename);
+        else {
+            sendError(2, errorCodes[2], socketfd, clientAddr);
+            return;
+        }
+    } 
+    ifstream input_file(_opcode == DIR ? "directory_structure.txt" : filename);
     if(!input_file.is_open()){
         sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it
         return;

@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string>
+#include <string.h>
 #include <cstring>
 #include <utility>
 #include "../connect.h"
@@ -11,10 +12,23 @@ using namespace std;
 int serverport = 69;
 uint16_t maxbuffersize = 516;
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
+    // if the user enter the in valid command line arguments then throw error
+    if(argc < 3){
+        cout << "Invalid arguments" << endl;
+        return 1;
+    }
+    // by default server ip address
+    const char* IP_address = "127.0.0.1";
+    // check if user passed the ip address in command line arguments then set the server ip address to passed value
+    for(int i=0; i<argc; i++){
+        if(strcmp(argv[i], "-ip")==0 && i + 1 < argc){
+            IP_address = argv[i+1];
+            break;
+        } 
+    }
     int sockfd;
     struct sockaddr_in serverAddr;
-
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
     if (sockfd < 0) {
@@ -25,12 +39,18 @@ int main(int argc, char **argv) {
     memset((char*)&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(serverport); // TFTP default port
-    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+    inet_pton(AF_INET, IP_address, &serverAddr.sin_addr);
 
     // Create an RRQ packet
-    uint16_t opcode = htons(WRQ); // Opcode for RRQ
-    string filename = "example.txt";
-    string mode = "netascii";
+    uint16_t opcode = 0; // Opcode for RRQ
+    if(strcmp(argv[1], "READ")==0) opcode = htons(RRQ);
+    else if(strcmp(argv[1], "WRITE")==0) opcode = htons(WRQ);
+    else if(strcmp(argv[1], "DIR") == 0) opcode = htons(DIR);
+    else {cout << "Invalid operation"<<endl; return 1;}
+    // file name from the command line arguments 
+    string filename = argv[2];
+    // the mode of transmission
+    string mode = "netascii"; 
     char *buffer;
     pair<char*, size_t> header =  create_RRQ_WRQ_header(opcode, filename, mode);
     int trycount = MAX_RETRY_REQUEST;
@@ -43,6 +63,7 @@ int main(int argc, char **argv) {
         if(datapacket != nullptr) {
             // if the server respose to the RRQ as data packet then client can start collect the data
             if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
+            else if(datapacket->opcode == DATA && ntohs(opcode) == DIR) reciveDirectoryData(sockfd, datapacket, serverAddr);
             // if server send the ACK and i first send write request it means server ready to connect for collecting file data
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
                 handleServer(serverAddr, "example.txt", sockfd);

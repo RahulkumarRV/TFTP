@@ -1,0 +1,5 @@
+./.ignore
+./server.cpp
+./server
+./Makefile
+./directory_structure.txt

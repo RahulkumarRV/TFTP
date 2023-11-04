@@ -49,10 +49,10 @@ int main(int argc, char **argv){
         int receive_status = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
         uint16_t opcode = getopcode(buffer);
         cout << buffer + sizeof(uint16_t) << endl;
-        if(opcode == RRQ){
+        if(opcode == RRQ || opcode == DIR){
             // Create a copy of the client address, buffer, and receive_status using lambda functions
             thread t([clientAddr, &buffer, &receive_status](){
-                handleClient(clientAddr, buffer + sizeof(uint16_t), receive_status);
+                handleClient(clientAddr, buffer + sizeof(uint16_t), getopcode(buffer), receive_status);
             }); 
             t.join();
         }else if(opcode == WRQ){
