@@ -308,7 +308,7 @@ struct packet* waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& add
 }
 
 // it handle the data coming for the requested rrq request
-void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename){
+void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename, bool isServer=false){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
     sockaddr_in newAddress;
@@ -319,7 +319,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     uint16_t opcode, errorcode, blocknumber;
     char *data;
     int trycount = 3;
-    if (filesystem::exists(filename)) {
+    if (filesystem::exists(filename) && isServer) {
         sendError(6, errorCodes[6], sockfd, address);
         return;
     }
@@ -337,7 +337,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
                 // fail to open the file due to file not exist
                 if(outputfile.rdstate() && ios_base::failbit){
                     sendError( 1, errorCodes[1], sockfd, address);
-                    cout << "File not found"<<endl;
                 }
                 return;
             }
@@ -508,6 +507,7 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, uint16_t 
     } 
     ifstream input_file(_opcode == DIR ? "directory_structure.txt" : filename);
     if(!input_file.is_open()){
+        cout << "Error";
         sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it
         return;
     }
@@ -592,7 +592,7 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
         cout << "[ERROR] Timeout occurred." <<endl;
         return;
     }else{
-        reciveData(socketfd, datapacket, clientAddr, filename);
+        reciveData(socketfd, datapacket, clientAddr, filename, true);
     }
 
 }

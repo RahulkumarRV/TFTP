@@ -2,7 +2,7 @@ Unhandled Exception: This error often occurs when an exception is thrown in your
 
 To resolve this, make sure to use try-catch blocks to catch and handle exceptions that may be thrown within your code.
 
-Out-of-Memory: In some cases, this error can occur when your program runs out of memory (e.g., due to excessive memory allocation) and the new operator is unable to allocate memory.
+Out-of-Memory: In some cases, this error can occur when your program runs out of memory (e.g., due to excessive memory allocation) and the new operator is unable to ad to thåallocate memory.
 
 To address this, ensure that you are properly managing memory in your program and that you release memory when it's no longer needed. Also, consider optimizing memory usage.
 

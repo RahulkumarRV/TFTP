@@ -54,13 +54,13 @@ int main(int argc, char **argv){
             thread t([clientAddr, &buffer, &receive_status](){
                 handleClient(clientAddr, buffer + sizeof(uint16_t), getopcode(buffer), receive_status);
             }); 
-            t.join();
+            t.detach();
         }else if(opcode == WRQ){
             // handle the client to write data on the server
             thread t([clientAddr, &buffer, &receive_status](){
                 handleClientToWriteFileOnServer(clientAddr, buffer, receive_status);
             });
-            t.join();
+            t.detach();
         }
         cout << " Thread finished" << endl;
     }
