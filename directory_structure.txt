@@ -1,0 +1,13 @@
+|-  .ignore
+|-  .vscode
+    |-  settings.json
+|-  client
+    |-  client
+    |-  client.cpp
+    |-  example.txt
+    |-  Makefile
+|-  connect.h
+|-  directory_structure.txt
+|-  src
+|-  test
+|-  test.cpp

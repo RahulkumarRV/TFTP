@@ -91,24 +91,27 @@ std::string trimNewline(const std::string& str, char toTrim) {
 
 // if the return emtpy list means may be the file .ignore file does not exist
 // else return the list of directories and the files to ignore
-std::unordered_set<std::string> readNamesOfIgnoreFiles() {
-    std::unordered_set<std::string> names;
-    std::ifstream file(".ignore");
+void readNamesOfIgnoreFiles(std::unordered_set<std::string>& names) {
+    
+    std::ifstream file("./.ignore");
     if (file.is_open()) {
         std::string name;
         while (!file.eof()) {
-            std::getline(file, name);
+            // std::getline(file, name);
+            file >> name;
+
             if(!file.eof())
-                names.insert(trimNewline(name, '\0'));
-            else names.insert(name);
+                names.insert(name);
+            else names.insert(name + '\0');
+            // names.insert(name);
         }
         file.close();
     }
-    return names;
 }
 
 void generateDirectory(string path){
-    unordered_set<string> paths = readNamesOfIgnoreFiles();
+    unordered_set<string> paths;
+    readNamesOfIgnoreFiles(paths);
     createDirectoryStructure(path, paths);
 }
 
@@ -393,29 +396,10 @@ void reciveDirectoryData(int sockfd, struct packet*& buffer, struct sockaddr_in&
     uint16_t opcode, errorcode, blocknumber;
     char *data;
     int trycount = 3;
-    // if (filesystem::exists(filename)) {
-    //     cout << "File " << filename << " already exists" << endl;
-    //     sendError(6, errorCodes[6], sockfd, address);
-    //     return;
-    // }
-    // // open the output file with given name
-    // outputfile.open(filename);
     while(moreDataAvailable){
         opcode = buffer->opcode;
         cout << opcode << " " << buffer->blocknumber << endl;
         if(opcode == DATA ){
-            // if the comming packet is data packet then store the data and send the ACK for this packet
-            // if(outputfile.is_open()){
-            //     outputfile << buffer->data;
-
-            // }else{
-            //     // fail to open the file due to file not exist
-            //     if(outputfile.rdstate() && ios_base::failbit){
-            //         sendError( 1, errorCodes[1], sockfd, address);
-            //         cout << "File not found"<<endl;
-            //     }
-            //     return;
-            // }
             cout << buffer->data;
         }else{
             // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
@@ -455,8 +439,6 @@ void reciveDirectoryData(int sockfd, struct packet*& buffer, struct sockaddr_in&
         }
 
     }
-
-    // outputfile.close();
 }
 
 
@@ -496,16 +478,10 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, uint16_t 
     string message = "server new port address";
     socklen_t addrLen = sizeof(clientAddr);
     uint16_t opcode = 3, blocknumber = 1;
-    char* databuffer, *buffer = (char*)malloc(MAX_PACKET_SIZE);
+    char *databuffer, buffer[MAX_PACKET_SIZE];
     // parse_RRQ_WRQ_header(buffer, opcode, filename, mode);
-    if(_opcode == DIR){
-        if(fs::exists(filename)) generateDirectory(filename);
-        else {
-            sendError(2, errorCodes[2], socketfd, clientAddr);
-            return;
-        }
-    } 
     ifstream input_file(_opcode == DIR ? "directory_structure.txt" : filename);
+    // ifstream input_file("directory_structure.txt");
     if(!input_file.is_open()){
         cout << "Error";
         sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it

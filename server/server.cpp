@@ -43,12 +43,20 @@ int main(int argc, char **argv){
     memset((char *) &clientAddr, 0, sizeof(clientAddr));
     
     char buffer[maxbuffersize]; // Adjust the buffer size accordingly
-
+    char *filename;
     while(true){
         // response for packet
         int receive_status = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&clientAddr, &addrLen);
         uint16_t opcode = getopcode(buffer);
         cout << buffer + sizeof(uint16_t) << endl;
+        filename = buffer + sizeof(uint16_t);
+        if(opcode == DIR){
+            if(fs::exists(filename)) generateDirectory(filename);
+            else {
+                sendError(2, errorCodes[2], sockfd, clientAddr);
+                return 1;
+            }
+        } 
         if(opcode == RRQ || opcode == DIR){
             // Create a copy of the client address, buffer, and receive_status using lambda functions
             thread t([clientAddr, &buffer, &receive_status](){
