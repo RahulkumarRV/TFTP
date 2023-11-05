@@ -1,5 +1,0 @@
-|-  demo.txt
-|-  example.txt
-|-  image.png
-|-  rahul
-    |-  server

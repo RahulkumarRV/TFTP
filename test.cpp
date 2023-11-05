@@ -79,8 +79,7 @@ void generateDirectory(string path){
 
 int main(){
 
-    // for (int i = 0; i < 5; i++) 
-        generateDirectory("./");
+    fs::create_directory("/rahul");
 
     return 0;
 }

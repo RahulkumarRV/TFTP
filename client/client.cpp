@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
     if(strcmp(argv[1], "READ")==0) opcode = htons(RRQ);
     else if(strcmp(argv[1], "WRITE")==0) opcode = htons(WRQ);
     else if(strcmp(argv[1], "DIR") == 0) opcode = htons(DIR);
+    else if(strcmp(argv[1], "MDIR") == 0) opcode = htons(MDIR);
     else {cout << "Invalid operation"<<endl; return 1;}
     // file name from the command line arguments 
     string filename = argv[2];
@@ -68,6 +69,7 @@ int main(int argc, char *argv[]) {
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
                 handleServer(serverAddr, "example.txt", sockfd);
             }
+            else if(datapacket->opcode == ACK && ntohs(opcode) == MDIR) cout << "Directory created successfully" << endl;
             // server send the error packet then shout down this connection
             else if(datapacket->opcode == ERROR){
                 cout << "[ERROR] " << datapacket->data << endl;

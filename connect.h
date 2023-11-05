@@ -23,7 +23,8 @@ enum packet_type {
     DATA,
     ACK,
     ERROR,
-    DIR
+    DIR,
+    MDIR
 }PACKET_TYPE;
 
 // store the error code with it's message

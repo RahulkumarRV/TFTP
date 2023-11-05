@@ -69,6 +69,14 @@ int main(int argc, char **argv){
                 handleClientToWriteFileOnServer(clientAddr, buffer, receive_status);
             });
             t.detach();
+        }else if(opcode == MDIR){
+            try{
+                fs::create_directories(filename);
+                pair<char*, size_t> packet = create_ACK_header(ACK, 0);
+                sendto(sockfd, packet.first, packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+            }catch(const std::exception &e){
+                sendError(6, errorCodes[6], sockfd, clientAddr);
+            }
         }
         cout << " Thread finished" << endl;
     }
