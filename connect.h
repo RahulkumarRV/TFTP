@@ -267,7 +267,7 @@ bool areSockAddressesEqual(const sockaddr_in& addr1, const sockaddr_in& addr2) {
 
 // wait for the response until timeout is reached
 // if response is come before the timeout then return packet and pass the result in (buffer) parms which pass as refrence
-// else return false
+// else return null pointer
 struct packet* waitForTimeOut(int sockfd, struct sockaddr_in& address, int timeout) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;        // seconds
@@ -298,18 +298,21 @@ struct packet* waitForTimeOut(int sockfd, struct sockaddr_in& address, int timeo
     }
 }
 
-// it handle the data coming for the requested rrq request
+// it handle the data received from the sender and store into the file 
 void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename, bool isServer=false){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
+    // create a new address variable for store the address of the sender
     sockaddr_in newAddress;
     memset((char*)&newAddress, 0, sizeof(sockaddr_in));
     socklen_t addrLen = sizeof(newAddress);
+    // create a output file 
     ofstream outputfile;
     // memset((char *)&address, 0, sizeof(address));
     uint16_t opcode, errorcode, blocknumber;
     char *data;
-    int trycount = 3;
+    int trycount = MAX_RETRY_REQUEST;
+    // if the filename file exist on the myside and i am server then send an error packet to sender becouse server not allowed any overwrites
     if (filesystem::exists(filename) && isServer) {
         sendError(6, errorCodes[6], sockfd, address);
         return;
@@ -321,46 +324,35 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         cout << opcode << " " << buffer->blocknumber << endl;
         if(opcode == DATA ){
             // if the comming packet is data packet then store the data and send the ACK for this packet
-            if(outputfile.is_open()){
-                outputfile << buffer->data;
-
-            }else{
+            if(outputfile.is_open()) outputfile << buffer->data;
+            else{
                 // fail to open the file due to file not exist
-                if(outputfile.rdstate() && ios_base::failbit){
-                    sendError( 1, errorCodes[1], sockfd, address);
-                }
+                if(outputfile.rdstate() && ios_base::failbit) sendError( 1, errorCodes[1], sockfd, address);
+                // .... here you can handle the other errors regarding the file system 
                 return;
             }
         }else{
             // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
-            if(buffer->opcode == ACK){
-                continue;
-            }
+            if(buffer->opcode == ACK) continue;
             // recived the error packet so print and terminate connection
-            else{
-                cout <<"[ERROR] " << buffer->data << endl;
-                break;
-            }
+            else{ cout <<"[ERROR] " << buffer->data << endl; break; }
         }
         cout << "buffer packet size : " << buffer->packet_length << endl;
+        /* if response has packet length (head + data) lesser than the max packet length it mean sender want to terminate the connection
+         so send sender back a ACK packet only and terminate the connection */
         if(buffer->packet_length < MAX_PACKET_SIZE){
             moreDataAvailable = false;
             outputfile.close();
             pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
-            sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
+            try {sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address)); } catch (const std::exception& e) {cout << e.what() << endl; }
         }else{
             trycount = MAX_RETRY_REQUEST;
             // create a acknowledgement packet for the currently proccesed packet
             pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
-            char* newbuffer; // will remove, unneccessary
             while(trycount-- > 0){
                 sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
                 buffer = waitForTimeOut(sockfd, newAddress, 1000);
-                if(buffer == nullptr){
-                    cout << "ERROR: Failed to recive packet" <<endl;
-                }else{
-                    break;
-                }
+                if(buffer == nullptr) cout << "[ERROR] Failed to recive packet" <<endl; else break;
             }
             if(trycount <= 0){
                 cout << "[ERROR] Timeout occurred." <<endl;
@@ -369,7 +361,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         }
 
     }
-
     outputfile.close();
 }
 
