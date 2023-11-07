@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     while(trycount-- > 0){
         sendto(sockfd, header.first, header.second,0,  (struct sockaddr *)&serverAddr, sizeof(serverAddr));
         // delete[] header.first;
-        struct packet* datapacket = waitForTimeOut(sockfd, buffer, serverAddr, 1000);
+        struct packet* datapacket = waitForTimeOut(sockfd, serverAddr, 1000);
         // char* header = creat
         if(datapacket != nullptr) {
             // if the server respose to the RRQ as data packet then client can start collect the data
@@ -88,10 +88,5 @@ int main(int argc, char *argv[]) {
         cout << "Connection not working" << endl;
         return 0;
     }
-    
-
-
-
-
     return 0;
 }

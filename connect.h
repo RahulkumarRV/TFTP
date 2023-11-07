@@ -75,13 +75,13 @@ void listAllDirectories(uint16_t depth, string path, const unordered_set<string>
         }
     }
 }
-
+// create a new directory structure file in which store the directory tree of the path 
 void createDirectoryStructure(string path, const unordered_set<string> ignorePaths){
     ofstream directory_structure("directory_structure.txt");
     listAllDirectories(0, path, ignorePaths, directory_structure);
     directory_structure.close();
 }
-
+// trime the string with ending character as toTrim
 std::string trimNewline(const std::string& str, char toTrim) {
     // Trim newline character from the end of the string
     if (!str.empty() && str[str.length()] == toTrim) {
@@ -109,7 +109,7 @@ void readNamesOfIgnoreFiles(std::unordered_set<std::string>& names) {
         file.close();
     }
 }
-
+// get the path for which the directory structure to create
 void generateDirectory(string path){
     unordered_set<string> paths;
     readNamesOfIgnoreFiles(paths);
@@ -162,10 +162,12 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
 }
 
 // create the data header of the tftp, which will be contains the opcode, block number and data
+// return data first (packet along with header) and second (size of the packet) 
 pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, char* data){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
     int dataLength = strlen(data);
+    // if the data passed for the packet exceeds to max capacity of the data in packet return with empty packet
     if(dataLength > datasize){
         cout << "data length exceeds 518 bytes";
         return make_pair(nullptr, -1);
@@ -173,7 +175,7 @@ pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, ch
     opcode = htons(opcode);
     blocknumber = htons(blocknumber);
     uint16_t size = sizeof(opcode) + sizeof(blocknumber);
-
+    // combine the opcode, block number and data to create a packet
     size_t buffer_size = size + dataLength;
     char *buffer = (char *) malloc(buffer_size);
     memcpy(buffer, &opcode, sizeof(opcode));
@@ -191,28 +193,26 @@ void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*
     // Extract opcode
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
-
     // Set filename pointer
     char* char_ptr = header + sizeof(opcode);
     filename = (char*) malloc(strlen(char_ptr) + 1);
     strcpy(filename, char_ptr);
-
     // Set mode pointer
     char_ptr = filename + strlen(char_ptr) + 1;
     mode = (char*) malloc(strlen(char_ptr) + 1);
     strcpy(mode, char_ptr);
 }
 
-
 // parse the acknowledgment header of tftp to get the opcode and block number
 void parse_ACK_header(char* header, uint16_t &opcode, uint16_t &blocknumber){
+    // extract opcode and block number for the header of the packet
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
     memcpy(&blocknumber, header + sizeof(opcode), sizeof(blocknumber));
     blocknumber = ntohs(blocknumber);
 }
 
-// parse the tftp header to extract the error code information 
+// parse the tftp header to extract the opcode, error code and error message
 void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, char*& errormessage, size_t packetSize){
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
@@ -225,23 +225,20 @@ void parse_ERROR_header(char* header, uint16_t &opcode, uint16_t &errorcode, cha
 }
 
 // parse the tftp header to extract the opcode, block number and data 
+// return the data length of the packet
 uint16_t parse_DATA_header(char* header, uint16_t& opcode, uint16_t& blocknumber, char*& data, size_t packetSize) {
     // Extract opcode
     memcpy(&opcode, header, sizeof(opcode));
     opcode = ntohs(opcode);
-
     // Extract block number
     memcpy(&blocknumber, header + sizeof(opcode), sizeof(blocknumber));
     blocknumber = ntohs(blocknumber);
-
     // Calculate the length of the data portion based on the packet size and header length
     size_t headerSize = sizeof(opcode) + sizeof(blocknumber);
     size_t dataLength = packetSize - headerSize;
-
     // Set the data pointer
     data = (char *)malloc(dataLength);
     memcpy(data, header + headerSize, dataLength);
-
     return dataLength;
 }
 
@@ -252,48 +249,38 @@ uint16_t getopcode(char buffer[]){
     return ntohs(opcode);
 }
 
-
-
+// create the error packet with error information and send to the address (addr) 
 void sendError(int code, string message, int socketfd, const sockaddr_in addr){
     pair<char*, size_t> errorpacket = create_ERROR_header(ERROR, code, message);
-    sendto(socketfd, errorpacket.first, errorpacket.second, 0, (struct sockaddr *)&addr, sizeof(addr));
+    try {sendto(socketfd, errorpacket.first, errorpacket.second, 0, (struct sockaddr *)&addr, sizeof(addr)); } catch (const std::exception& e) {cout << e.what() << endl;}
 }
 
 // check the address's are equal by IP and socket address
 bool areSockAddressesEqual(const sockaddr_in& addr1, const sockaddr_in& addr2) {
     // Compare the IP address
-    if (addr1.sin_addr.s_addr != addr2.sin_addr.s_addr) {
-        return false;
-    }
+    if (addr1.sin_addr.s_addr != addr2.sin_addr.s_addr) return false;
     // Compare the port
-    if (addr1.sin_port != addr2.sin_port) {
-        return false;
-    }
+    if (addr1.sin_port != addr2.sin_port) return false;
     // The addresses are the same
     return true;
 }
 
 // wait for the response until timeout is reached
-// if response is come before the timeout then return true and pass the result in parms which pass as refrence
+// if response is come before the timeout then return packet and pass the result in (buffer) parms which pass as refrence
 // else return false
-struct packet* waitForTimeOut(int sockfd, char*& buffer, struct sockaddr_in& address, int timeout) {
+struct packet* waitForTimeOut(int sockfd, struct sockaddr_in& address, int timeout) {
     struct timeval tv;
     tv.tv_sec = timeout / 1000;        // seconds
     tv.tv_usec = (timeout % 1000) * 1000;  // microseconds
-    int bufferSize = sizeof(buffer);
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(sockfd, &fds);
-
     int selectResult = select(sockfd + 1, &fds, NULL, NULL, &tv);
-
     if (selectResult < 0) {
         std::cerr << "select failed" << std::endl;
         return nullptr;
-    } else if (selectResult == 0) {
-        // Timeout
-        return nullptr;
-    } else {
+    } else if (selectResult == 0) return nullptr;
+    else {
         // Data available to read
         char databuffer[MAX_PACKET_SIZE];
         socklen_t addressLen = sizeof(address);
@@ -368,7 +355,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
             char* newbuffer; // will remove, unneccessary
             while(trycount-- > 0){
                 sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
-                buffer = waitForTimeOut(sockfd, newbuffer, newAddress, 1000);
+                buffer = waitForTimeOut(sockfd, newAddress, 1000);
                 if(buffer == nullptr){
                     cout << "ERROR: Failed to recive packet" <<endl;
                 }else{
@@ -426,7 +413,7 @@ void reciveDirectoryData(int sockfd, struct packet*& buffer, struct sockaddr_in&
             char* newbuffer; // will remove, unneccessary
             while(trycount-- > 0){
                 sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
-                buffer = waitForTimeOut(sockfd, newbuffer, newAddress, 1000);
+                buffer = waitForTimeOut(sockfd, newAddress, 1000);
                 if(buffer == nullptr){
                     cout << "ERROR: Failed to recive packet" <<endl;
                 }else{
@@ -558,7 +545,7 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
     int trycount = MAX_RETRY_REQUEST;
     while(trycount-- > 0){
         sendto(socketfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-        datapacket = waitForTimeOut(socketfd, newbuffer, myAddress, 1000);
+        datapacket = waitForTimeOut(socketfd, myAddress, 1000);
         if(datapacket != nullptr){
             break;
         }
@@ -610,7 +597,7 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
             // socklen_t addrlen = sizeof(addr);
             pair<char*, size_t> packet = create_DATA_header(DATA, blocknumber, databuffer);
             sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-            responsepacket = waitForTimeOut(socketfd, buffer, addr, 1000);
+            responsepacket = waitForTimeOut(socketfd, addr, 1000);
             if(responsepacket != nullptr && responsepacket->blocknumber < blocknumber) {
                 trycount++;
             }else if (responsepacket != nullptr && (responsepacket->blocknumber == blocknumber || responsepacket->opcode == ERROR)){
