@@ -38,7 +38,7 @@ unordered_map<int, string> errorCodes = {
         {6, "File already exists."},
         {7, "No such user."}
     };
-
+// packet structure contains header information along with packet data and it's length
 struct packet {
     uint16_t opcode;
     uint16_t error_code;
@@ -112,6 +112,14 @@ void generateDirectory(string path){
     createDirectoryStructure(path, paths);
 }
 // create directory structure end
+
+// initialize the address to the IP address and port
+void initializeAddressWithIPAndPort(sockaddr_in& addr, int port, const char* ip){
+    memset((char *) &addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &addr.sin_addr);
+}
 
 // create the rrq or wrq header which will contains the opcode, file name and mode of transfer
 pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filename, const string& mode) {

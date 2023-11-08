@@ -13,21 +13,23 @@ int myport = 69;
 uint16_t maxbuffersize = 516;
 
 int main(int argc, char **argv){
-    
-    int sockfd;
-    struct sockaddr_in serverAddr, clientAddr;
-
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
-    if(sockfd < 0){
-        cerr<< "socket error while creating socket" <<endl;
-        return -1;
+    const char* IP_address = "127.0.0.1";
+     // check if user passed the ip address in command line arguments then set the server ip address to passed value
+    for(int i=0; i<argc; i++){
+        if(strcmp(argv[i], "-ip")==0 && i + 1 < argc){
+            IP_address = argv[i+1];
+            break;
+        } 
     }
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(sockfd < 0){ cerr<< "socket error while creating socket" <<endl; return -1; }
     // create the server address
-    memset((char *) &serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(myport);
-    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+    struct sockaddr_in serverAddr, clientAddr;
+    // memset((char *) &serverAddr, 0, sizeof(serverAddr));
+    // serverAddr.sin_family = AF_INET;
+    // serverAddr.sin_port = htons(myport);
+    // inet_pton(AF_INET, IP_address, &serverAddr.sin_addr);
+    initializeAddressWithIPAndPort(serverAddr, myport, IP_address);
     // bind the server to the address on this machine
     int status = bind(sockfd, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
     // check if the server is successfully bind the the address or not

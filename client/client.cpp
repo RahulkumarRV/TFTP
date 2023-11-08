@@ -27,15 +27,11 @@ int main(int argc, char *argv[]) {
             break;
         } 
     }
-    int sockfd;
-    struct sockaddr_in serverAddr;
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-    if (sockfd < 0) {
-        cerr << "socket error while creating socket" << endl;
-        return -1;
-    }
+    if (sockfd < 0) { cerr << "socket error while creating socket" << endl; return -1; }
     // create the address of the server accroding the given port and ip address
+    struct sockaddr_in serverAddr;
     memset((char*)&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(serverport); // TFTP default port
