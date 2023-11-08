@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
         if(datapacket != nullptr) {
             // if the server respose to the RRQ as data packet then client can start collect the data
             if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
-            else if(datapacket->opcode == DATA && ntohs(opcode) == DIR) reciveDirectoryData(sockfd, datapacket, serverAddr);
+            else if(datapacket->opcode == DATA && ntohs(opcode) == DIR) reciveData(sockfd, datapacket, serverAddr, "", false, true);
             // if server send the ACK and i first send write request it means server ready to connect for collecting file data
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
                 handleServer(serverAddr, "example.txt", sockfd);

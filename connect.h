@@ -47,9 +47,7 @@ struct packet {
     uint16_t packet_length;
 };
 
-
 // create directory structure start
-
 string getFileOrDirName(string path){
     string result = "";
     int i = path.length() - 1;
@@ -59,7 +57,6 @@ string getFileOrDirName(string path){
     }
     return result;
 }
-
 // create directory structure in the file directory_structure.txt
 void listAllDirectories(uint16_t depth, string path, const unordered_set<string> ignorePaths, ofstream& directory_structure){
     if(fs::exists(path) && fs::is_directory(path)){
@@ -89,7 +86,6 @@ std::string trimNewline(const std::string& str, char toTrim) {
     }
     return str;
 }
-
 // if the return emtpy list means may be the file .ignore file does not exist
 // else return the list of directories and the files to ignore
 void readNamesOfIgnoreFiles(std::unordered_set<std::string>& names) {
@@ -115,7 +111,6 @@ void generateDirectory(string path){
     readNamesOfIgnoreFiles(paths);
     createDirectoryStructure(path, paths);
 }
-
 // create directory structure end
 
 // create the rrq or wrq header which will contains the opcode, file name and mode of transfer
@@ -299,7 +294,7 @@ struct packet* waitForTimeOut(int sockfd, struct sockaddr_in& address, int timeo
 }
 
 // it handle the data received from the sender and store into the file 
-void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename, bool isServer=false){
+void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address, string filename, bool isServer=false, bool isForDirectory=false){
     uint16_t offset = 0, number_of_bytes = 0;
     bool moreDataAvailable = true;
     // create a new address variable for store the address of the sender
@@ -307,10 +302,8 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     memset((char*)&newAddress, 0, sizeof(sockaddr_in));
     socklen_t addrLen = sizeof(newAddress);
     // create a output file 
-    ofstream outputfile;
     // memset((char *)&address, 0, sizeof(address));
-    uint16_t opcode, errorcode, blocknumber;
-    char *data;
+    uint16_t opcode;
     int trycount = MAX_RETRY_REQUEST;
     // if the filename file exist on the myside and i am server then send an error packet to sender becouse server not allowed any overwrites
     if (filesystem::exists(filename) && isServer) {
@@ -318,19 +311,22 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         return;
     }
     // open the output file with given name
-    outputfile.open(filename);
+    ofstream outputfile; 
+    if(!isForDirectory) outputfile.open(filename);
     while(moreDataAvailable){
         opcode = buffer->opcode;
         cout << opcode << " " << buffer->blocknumber << endl;
         if(opcode == DATA ){
-            // if the comming packet is data packet then store the data and send the ACK for this packet
-            if(outputfile.is_open()) outputfile << buffer->data;
-            else{
-                // fail to open the file due to file not exist
-                if(outputfile.rdstate() && ios_base::failbit) sendError( 1, errorCodes[1], sockfd, address);
-                // .... here you can handle the other errors regarding the file system 
-                return;
-            }
+            if(!isForDirectory){
+                // if the comming packet is data packet then store the data and send the ACK for this packet
+                if(outputfile.is_open()) outputfile << buffer->data;
+                else{
+                    // fail to open the file due to file not exist
+                    if(outputfile.rdstate() && ios_base::failbit) sendError( 1, errorCodes[1], sockfd, address);
+                    // .... here you can handle the other errors regarding the file system 
+                    return;
+                }
+            }else cout << buffer->data;
         }else{
             // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
             if(buffer->opcode == ACK) continue;
@@ -363,63 +359,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
     }
     outputfile.close();
 }
-
-void reciveDirectoryData(int sockfd, struct packet*& buffer, struct sockaddr_in& address){
-    uint16_t offset = 0, number_of_bytes = 0;
-    bool moreDataAvailable = true;
-    sockaddr_in newAddress;
-    memset((char*)&newAddress, 0, sizeof(sockaddr_in));
-    socklen_t addrLen = sizeof(newAddress);
-    // ofstream outputfile;
-    // memset((char *)&address, 0, sizeof(address));
-    uint16_t opcode, errorcode, blocknumber;
-    char *data;
-    int trycount = 3;
-    while(moreDataAvailable){
-        opcode = buffer->opcode;
-        cout << opcode << " " << buffer->blocknumber << endl;
-        if(opcode == DATA ){
-            cout << buffer->data;
-        }else{
-            // expecting DATA packet but recived acknowledgement so ignore it may be server sended it pay mistake
-            if(buffer->opcode == ACK){
-                continue;
-            }
-            // recived the error packet so print and terminate connection
-            else{
-                cout <<"[ERROR] " << buffer->data << endl;
-                break;
-            }
-        }
-        cout << "buffer packet size : " << buffer->packet_length << endl;
-        if(buffer->packet_length < MAX_PACKET_SIZE){
-            moreDataAvailable = false;
-            // outputfile.close();
-            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
-            sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
-        }else{
-            trycount = MAX_RETRY_REQUEST;
-            // create a acknowledgement packet for the currently proccesed packet
-            pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
-            char* newbuffer; // will remove, unneccessary
-            while(trycount-- > 0){
-                sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
-                buffer = waitForTimeOut(sockfd, newAddress, 1000);
-                if(buffer == nullptr){
-                    cout << "ERROR: Failed to recive packet" <<endl;
-                }else{
-                    break;
-                }
-            }
-            if(trycount <= 0){
-                cout << "[ERROR] Timeout occurred." <<endl;
-                break;
-            }
-        }
-
-    }
-}
-
 
 // genreate the random port number for the given address and bind it to the generated port number in the given range
 int generateRandomPortAndBind(int minPort, int maxPort, struct sockaddr_in& addr, int sockfd) 
@@ -462,7 +401,6 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, uint16_t 
     ifstream input_file(_opcode == DIR ? "directory_structure.txt" : filename);
     // ifstream input_file("directory_structure.txt");
     if(!input_file.is_open()){
-        cout << "Error";
         sendError(1, errorCodes[1], socketfd, clientAddr); // need to test it
         return;
     }
