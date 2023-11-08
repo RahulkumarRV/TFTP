@@ -25,10 +25,6 @@ int main(int argc, char **argv){
     if(sockfd < 0){ cerr<< "socket error while creating socket" <<endl; return -1; }
     // create the server address
     struct sockaddr_in serverAddr, clientAddr;
-    // memset((char *) &serverAddr, 0, sizeof(serverAddr));
-    // serverAddr.sin_family = AF_INET;
-    // serverAddr.sin_port = htons(myport);
-    // inet_pton(AF_INET, IP_address, &serverAddr.sin_addr);
     initializeAddressWithIPAndPort(serverAddr, myport, IP_address);
     // bind the server to the address on this machine
     int status = bind(sockfd, (struct sockaddr *) &serverAddr, sizeof(serverAddr));

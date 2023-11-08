@@ -32,11 +32,7 @@ int main(int argc, char *argv[]) {
     if (sockfd < 0) { cerr << "socket error while creating socket" << endl; return -1; }
     // create the address of the server accroding the given port and ip address
     struct sockaddr_in serverAddr;
-    memset((char*)&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(serverport); // TFTP default port
-    inet_pton(AF_INET, IP_address, &serverAddr.sin_addr);
-
+    initializeAddressWithIPAndPort(serverAddr, serverport, IP_address);
     // Create an RRQ packet
     uint16_t opcode = 0; // Opcode for RRQ
     if(strcmp(argv[1], "READ")==0) opcode = htons(RRQ);
