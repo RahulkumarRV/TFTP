@@ -556,6 +556,36 @@ TEST_F(SockAddressEqualityTest, DifferentPorts) {
 
     EXPECT_FALSE(areSockAddressesEqual(addr1, addr2));
 }
+// Test setup for RandomPortGenerator
+class RandomPortGeneratorTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        ASSERT_TRUE(sockfd > 0) << "Error creating socket";
+        
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
+    void TearDown() override {
+        close(sockfd);
+    }
+
+    struct sockaddr_in serverAddr;
+    int sockfd;
+};
+// test case for RandomPortGenerator
+TEST_F(RandomPortGeneratorTest, TestPortGeneration) {
+    int minPort = 50000;
+    int maxPort = 50100;
+
+    int port = generateRandomPortAndBind(minPort, maxPort, serverAddr, sockfd);
+
+    // Check that the generated port is within the specified range
+    ASSERT_GE(port, minPort);
+    ASSERT_LE(port, maxPort);
+}
 
 int main(int argc, char *argv[]){
 
