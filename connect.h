@@ -27,6 +27,43 @@ enum packet_type {
     MDIR
 }PACKET_TYPE;
 
+// progress bar 
+class progressBar {
+private:
+    double progress;  // Declare the static member
+    int barWidth; // Declare the static member
+public:
+    progressBar() {progress = 0.0; barWidth = 50; }
+
+    void setBarWidht(int w){
+        barWidth = w;
+    }
+
+    double getProgress(){return progress;}
+
+    void updateProgressBar() {
+        float progressRatio = static_cast<float>(progress) / 100.0f;
+        int barProgress = static_cast<int>(barWidth * progressRatio);
+
+        std::cout << "\r[";
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < barProgress) {
+                std::cout << "=";
+            } else {
+                std::cout << " ";
+            }
+        }
+
+        std::cout << "] " << std::setw(3) << progress << "%";
+        std::cout.flush();
+    }
+
+    void updatePercent(double _progress) {
+        progress = _progress;
+        updateProgressBar();
+    }
+};
+
 // store the error code with it's message
 unordered_map<int, string> errorCodes = {
         {0, "Not defined, see error message (if any)."},
@@ -310,12 +347,14 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
         sendError(6, errorCodes[6], sockfd, address);
         return;
     }
+    // set up the progress bar
+    progressBar pbar;
+    pbar.updatePercent(1);
     // open the output file with given name
     ofstream outputfile; 
     if(!isForDirectory) outputfile.open(filename);
     while(moreDataAvailable){
         opcode = buffer->opcode;
-        cout << opcode << " " << buffer->blocknumber << endl;
         if(opcode == DATA ){
             if(!isForDirectory){
                 // if the comming packet is data packet then store the data and send the ACK for this packet
@@ -333,7 +372,6 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
             // recived the error packet so print and terminate connection
             else{ cout <<"[ERROR] " << buffer->data << endl; break; }
         }
-        cout << "buffer packet size : " << buffer->packet_length << endl;
         /* if response has packet length (head + data) lesser than the max packet length it mean sender want to terminate the connection
          so send sender back a ACK packet only and terminate the connection */
         if(buffer->packet_length < MAX_PACKET_SIZE){
@@ -341,7 +379,9 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
             outputfile.close();
             pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
             try {sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address)); } catch (const std::exception& e) {cout << e.what() << endl; }
+            pbar.updatePercent(100);
         }else{
+            pbar.updatePercent(buffer->blocknumber % 100);
             trycount = MAX_RETRY_REQUEST;
             // create a acknowledgement packet for the currently proccesed packet
             pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
@@ -438,7 +478,6 @@ void handleClient(struct sockaddr_in clientAddr, const char* filename, uint16_t 
             
         // }
         currentPosition = input_file.tellg();
-        cout << "current position: " << currentPosition << endl;
         fileSize -= input_file.gcount();
         // free(databuffer);
         iteration++;
