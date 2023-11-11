@@ -586,6 +586,35 @@ TEST_F(RandomPortGeneratorTest, TestPortGeneration) {
     ASSERT_GE(port, minPort);
     ASSERT_LE(port, maxPort);
 }
+// Test class setup
+class ErrorSenderTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        ASSERT_TRUE(sockfd > 0) ;
+
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Loopback address for local testing
+        serverAddr.sin_port = htons(12345);  // Choose any available port for test
+    }
+
+    void TearDown() override {
+        close(sockfd);
+    }
+
+    struct sockaddr_in serverAddr;
+    int sockfd;
+};
+
+// Test case for sendError function
+TEST_F(ErrorSenderTest, TestSendError) {
+    int errorCode = 404;
+    std::string errorMessage = "Not Found";
+
+    ASSERT_NO_THROW(sendError(errorCode, errorMessage, sockfd, serverAddr));
+
+}
 
 int main(int argc, char *argv[]){
 
