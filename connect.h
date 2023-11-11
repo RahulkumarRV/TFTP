@@ -122,9 +122,9 @@ pair<char*, size_t> create_RRQ_WRQ_header(uint16_t opcode, const string& filenam
     // Copy data into the buffer
     memcpy(buffer, &opcode, sizeof(opcode));
     memcpy(buffer + sizeof(opcode), filename.c_str(), filename.length());
-    buffer[sizeof(opcode) + filename.length()] = 0; // Null separator
+    buffer[sizeof(opcode) + filename.length()] = '\0'; // Null separator
     memcpy(buffer + sizeof(opcode) + filename.length() + 1, mode.c_str(), mode.length());
-    buffer[buffer_size - 1] = 0; // Null terminator
+    buffer[buffer_size - 1] = '\0'; // Null terminator
     // return the buffer containing header and it's size 
     return make_pair(buffer, buffer_size);
 }
@@ -158,7 +158,7 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
 
 // create the data header of the tftp, which will be contains the opcode, block number and data
 // return data first (packet along with header) and second (size of the packet) 
-pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, char* data){
+pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, const char* data){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
     int dataLength = strlen(data);
@@ -193,7 +193,7 @@ void parse_RRQ_WRQ_header(char* header, uint16_t& opcode, char*& filename, char*
     filename = (char*) malloc(strlen(char_ptr) + 1);
     strcpy(filename, char_ptr);
     // Set mode pointer
-    char_ptr = filename + strlen(char_ptr) + 1;
+    char_ptr = header + sizeof(opcode) + strlen(char_ptr) + 1;
     mode = (char*) malloc(strlen(char_ptr) + 1);
     strcpy(mode, char_ptr);
 }
