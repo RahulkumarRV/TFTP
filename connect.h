@@ -73,24 +73,16 @@ void listAllDirectories(uint16_t depth, string path, const unordered_set<string>
     }
 }
 // create a new directory structure file in which store the directory tree of the path 
-void createDirectoryStructure(string path, const unordered_set<string> ignorePaths){
-    ofstream directory_structure("directory_structure.txt");
+void createDirectoryStructure(string path, const unordered_set<string> ignorePaths, const char* directory = "directory_structure.txt"){
+    ofstream directory_structure(directory);
     listAllDirectories(0, path, ignorePaths, directory_structure);
     directory_structure.close();
 }
-// trime the string with ending character as toTrim
-std::string trimNewline(const std::string& str, char toTrim) {
-    // Trim newline character from the end of the string
-    if (!str.empty() && str[str.length()] == toTrim) {
-        return str.substr(0, str.length() - 1);
-    }
-    return str;
-}
+
 // if the return emtpy list means may be the file .ignore file does not exist
 // else return the list of directories and the files to ignore
-void readNamesOfIgnoreFiles(std::unordered_set<std::string>& names) {
-    
-    std::ifstream file("./.ignore");
+void readNamesOfIgnoreFiles(std::unordered_set<std::string>& names, const char* filename = "./.ignore") {
+    std::ifstream file(filename);
     if (file.is_open()) {
         std::string name;
         while (!file.eof()) {

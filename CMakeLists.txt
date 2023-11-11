@@ -3,7 +3,7 @@ project("Gtest")
 
 find_package(GTest REQUIRED)
 
-add_executable(a.out testcase.cpp)
+add_executable(a.out ./test/test.cpp)
 target_link_libraries(a.out ${GTEST_LIBRARIES})
 
 #ctest
