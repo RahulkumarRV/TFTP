@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
+#include "./compression/deflate.h"
 using namespace std;
 namespace fs = std::filesystem;
 
@@ -61,6 +62,7 @@ public:
     void updatePercent(double _progress) {
         progress = _progress;
         updateProgressBar();
+        if(_progress == 100) cout << endl;
     }
 };
 
