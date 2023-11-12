@@ -18,6 +18,8 @@ int main(int argc, char *argv[]) {
         cout << "Invalid arguments" << endl;
         return 1;
     }
+    char* dp = argv[2];
+    
     // by default server ip address
     const char* IP_address = "127.0.0.1";
     // check if user passed the ip address in command line arguments then set the server ip address to passed value
@@ -41,10 +43,16 @@ int main(int argc, char *argv[]) {
     else if(strcmp(argv[1], "MDIR") == 0) opcode = htons(MDIR);
     else {cout << "Invalid operation"<<endl; return 1;}
     // file name from the command line arguments 
-    string filename = argv[2];
+    const char* filename = argv[2];
+
+    // if(ntohs(opcode) == WRQ && isCompressedFileExist(filename)) {
+    //     cout << "filnaem : " << filename << endl;
+    //     filename = changeExtension(filename, ".bin").c_str();
+    // }
     // the mode of transmission
     string mode = "netascii"; 
     char *buffer;
+
     pair<char*, size_t> header =  create_RRQ_WRQ_header(opcode, filename, mode);
     int trycount = MAX_RETRY_REQUEST;
     // this while loop will take care if the send request is unsuccessful then it rety and wait for the timeout time for next resend until the limit of retries is reached
@@ -55,11 +63,14 @@ int main(int argc, char *argv[]) {
         // char* header = creat
         if(datapacket != nullptr) {
             // if the server respose to the RRQ as data packet then client can start collect the data
-            if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) reciveData(sockfd, datapacket, serverAddr, filename);
+            if(datapacket->opcode == DATA && ntohs(opcode) == RRQ) {
+                reciveData(sockfd, datapacket, serverAddr, filename);
+                // isDecompressedFileExist(filename);
+            }
             else if(datapacket->opcode == DATA && ntohs(opcode) == DIR) reciveData(sockfd, datapacket, serverAddr, "", false, true);
             // if server send the ACK and i first send write request it means server ready to connect for collecting file data
             else if(datapacket->opcode == ACK && ntohs(opcode) == WRQ){
-                handleServer(serverAddr, "example.txt", sockfd);
+                handleServer(serverAddr, filename, sockfd);
             }
             else if(datapacket->opcode == ACK && ntohs(opcode) == MDIR) cout << "Directory created successfully" << endl;
             // server send the error packet then shout down this connection

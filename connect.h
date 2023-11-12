@@ -17,6 +17,7 @@ namespace fs = std::filesystem;
 #define MAX_PACKET_SIZE 516 // sotre the maximum packet size including the header and data 
 #define MAX_RETRY_REQUEST 3
 #define MAX_ITERATIONS 32768
+#define TIMEOUTTIME 1000
 // use as palceholder for the type of the request packet
 enum packet_type {
     RRQ = 1,
@@ -85,13 +86,6 @@ struct packet {
     char *data;
     uint16_t packet_length;
 };
-
-bool isCompressedFileExis(const char *filename){
-    compress(filename);
-    if(fs::exists(changeExtension(filename, ".bin"))){
-        return true;
-    }else return false;
-}
 
 // create directory structure start
 string getFileOrDirName(string path){
@@ -207,12 +201,16 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
 pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, const char* data, int _length = -1){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
-    int dataLength ;
-    if(_length != -1) dataLength = datasize;
-    else dataLength = _length;
+
+    int dataLength;
+    if(_length == -1){
+        dataLength = strlen(data);
+    }else{
+        dataLength = _length;
+    }
     // if the data passed for the packet exceeds to max capacity of the data in packet return with empty packet
     if(dataLength > datasize){
-        cout << "data length exceeds 518 bytes";
+        cout << "data length exceeds 518 bytes" << dataLength;
         return make_pair(nullptr, -1);
     } 
     opcode = htons(opcode);
@@ -328,6 +326,7 @@ struct packet* waitForTimeOut(int sockfd, struct sockaddr_in& address, int timeo
         char databuffer[MAX_PACKET_SIZE];
         socklen_t addressLen = sizeof(address);
         int bytesReceived = recvfrom(sockfd, databuffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)&address, &addressLen);
+        
         struct packet *newPacket = (struct packet*) malloc(sizeof(struct packet));
         // block number will be as error code if the opcode is ERROR and error message is data
         parse_DATA_header(databuffer, newPacket->opcode, newPacket->blocknumber, newPacket->data, bytesReceived);
@@ -398,7 +397,7 @@ void reciveData(int sockfd, struct packet*& buffer, struct sockaddr_in& address,
             pair<char*, size_t> ack_packet = create_ACK_header(ACK, buffer->blocknumber);
             while(trycount-- > 0){
                 sendto(sockfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&address, sizeof(address));
-                buffer = waitForTimeOut(sockfd, newAddress, 1000);
+                buffer = waitForTimeOut(sockfd, newAddress, TIMEOUTTIME);
                 if(buffer == nullptr) cout << "[ERROR] Failed to recive packet" <<endl; else break;
             }
             if(trycount <= 0){
@@ -524,7 +523,7 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
     int trycount = MAX_RETRY_REQUEST;
     while(trycount-- > 0){
         sendto(socketfd, ack_packet.first, ack_packet.second, 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-        datapacket = waitForTimeOut(socketfd, myAddress, 1000);
+        datapacket = waitForTimeOut(socketfd, myAddress, TIMEOUTTIME);
         if(datapacket != nullptr){
             break;
         }
@@ -538,6 +537,27 @@ void handleClientToWriteFileOnServer(struct sockaddr_in clientAddr, char* buffer
         reciveData(socketfd, datapacket, clientAddr, filename, true);
     }
 
+}
+
+bool isCompressedFileExist(const char* filename){
+    compress(filename);
+    if(fs::exists(changeExtension(filename, ".bin"))) return true;
+    else return false;
+}
+
+string whatisextension(const char* filename){
+    std::string filepath(filename);
+    int lastPosition = filepath.find_last_of('.');
+    return filepath.substr(lastPosition);
+}
+
+bool isDecompressedFileExist(const char* filename) {
+
+    if(fs::exists(filename) && whatisextension(filename) == ".bin"){
+        decompress(filename);
+    }
+    
+    return true;
 }
 
 // handle server to send file from the client to the server
@@ -561,6 +581,7 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
     uint16_t opcode = DATA, blocknumber = 1;
     // progress bar
     progressBar pbar;
+    input_file.seekg(0, ios::beg);
     while(iteration <= MAX_ITERATIONS && !input_file.eof()){
 
         int minFileSize = min(MAX_PACKET_SIZE - 4, fileSize + 1);
@@ -576,9 +597,9 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
         while(trycount-- > 0){
             memset((char *)&addr, 0, sizeof(sockaddr_in));
             // socklen_t addrlen = sizeof(addr);
-            pair<char*, size_t> packet = create_DATA_header(DATA, blocknumber, databuffer);
+            pair<char*, size_t> packet = create_DATA_header(DATA, blocknumber, databuffer, minFileSize);
             sendto(socketfd, packet.first, packet.second, 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-            responsepacket = waitForTimeOut(socketfd, addr, 1000);
+            responsepacket = waitForTimeOut(socketfd, addr, TIMEOUTTIME);
             if(responsepacket != nullptr && responsepacket->blocknumber < blocknumber) {
                 trycount++;
             }else if (responsepacket != nullptr && (responsepacket->blocknumber == blocknumber || responsepacket->opcode == ERROR)){

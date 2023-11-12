@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <thread>
 #include "../connect.h"
 
 // Test cases for getFileOrDirName function
@@ -38,7 +39,6 @@ TEST(GetFileOrDirNameTest, MultipleSeparatorsTest) {
     std::string result = getFileOrDirName(path);
     EXPECT_EQ(result, "");
 }
-
 // Function to get the content of a file
 std::string getFileContent(const std::string& filePath) {
     std::ifstream file(filePath);
@@ -555,6 +555,110 @@ TEST_F(SockAddressEqualityTest, DifferentPorts) {
     sockaddr_in addr2 = createSockAddress("192.168.1.1", 9090);
 
     EXPECT_FALSE(areSockAddressesEqual(addr1, addr2));
+}
+
+// Test setup for RandomPortGenerator
+class RandomPortGeneratorTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        ASSERT_TRUE(sockfd > 0) << "Error creating socket";
+        
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
+    void TearDown() override {
+        close(sockfd);
+    }
+
+    struct sockaddr_in serverAddr;
+    int sockfd;
+};
+// test case for RandomPortGenerator
+TEST_F(RandomPortGeneratorTest, TestPortGeneration) {
+    int minPort = 50000;
+    int maxPort = 50100;
+
+    int port = generateRandomPortAndBind(minPort, maxPort, serverAddr, sockfd);
+
+    // Check that the generated port is within the specified range
+    ASSERT_GE(port, minPort);
+    ASSERT_LE(port, maxPort);
+}
+// Test class setup
+class ErrorSenderTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        ASSERT_TRUE(sockfd > 0) ;
+
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Loopback address for local testing
+        serverAddr.sin_port = htons(12345);  // Choose any available port for test
+    }
+
+    void TearDown() override {
+        close(sockfd);
+    }
+
+    struct sockaddr_in serverAddr;
+    int sockfd;
+};
+
+// Test case for sendError function
+TEST_F(ErrorSenderTest, TestSendError) {
+    int errorCode = 404;
+    std::string errorMessage = "Not Found";
+
+    ASSERT_NO_THROW(sendError(errorCode, errorMessage, sockfd, serverAddr));
+
+}
+// helper test class
+class TimeoutWaiterTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        ASSERT_TRUE(sockfd > 0) << "Error creating socket";
+
+        memset(&serverAddr, 0, sizeof(serverAddr));
+        serverAddr.sin_family = AF_INET;
+        serverAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Loopback address for local testing
+        serverAddr.sin_port = htons(12345);  // Choose any available port
+    }
+
+    void TearDown() override {
+        close(sockfd);
+    }
+
+    struct sockaddr_in serverAddr;
+    int sockfd;
+};
+
+
+// Test case for waitForTimeOut function
+TEST_F(TimeoutWaiterTest, TestWaitForTimeout) {
+    int timeout = 1000;  // 1000 milliseconds timeout
+
+    // waitForTimeOut is has a method which is to be mocked , to test indirectly we created a thread
+    //alternaively we can mock this 
+
+    // Create a thread to send data after a delay
+    std::thread senderThread([&]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(timeout / 2));
+        sendto(sockfd, "Test Data", strlen("Test Data"), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    });
+
+    // Call waitForTimeOut and check if it receives the expected data
+    struct packet* receivedPacket = waitForTimeOut(sockfd, serverAddr, timeout * 2);
+
+    // Check if the received packet is null as it will recieve no packet 
+    ASSERT_TRUE(receivedPacket == nullptr);
+
+    // Clean up the thread
+    senderThread.join();
 }
 
 int main(int argc, char *argv[]){
