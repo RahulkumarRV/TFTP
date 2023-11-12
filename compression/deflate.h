@@ -24,10 +24,11 @@ struct LZ77Token
 //     return filenameWithoutExtension.c_str();
 // }
 
-const char* renameToText(const char* filename) {
+const char *renameToText(const char *filename)
+{
     std::string strFilename(filename);
     std::string filenameWithoutExtension = strFilename.substr(0, strFilename.find_last_of(".")) + ".txt";
-    char* result = strdup(filenameWithoutExtension.c_str());
+    char *result = strdup(filenameWithoutExtension.c_str());
     return result;
 }
 
@@ -78,6 +79,11 @@ vector<LZ77Token> stringToToken(const char *filename)
 
         inputFile.close(); // Close the file
 
+        // Display the tokens
+        for (const auto &token : tokens)
+        {
+            std::cout << "Offset: " << token.offset << " Length: " << token.length << " Next Char: " << token.nextChar << std::endl;
+        }
     }
     else
     {
@@ -142,6 +148,7 @@ std::vector<LZ77Token> parseTuples(const std::string &filename)
 void writeToBinaryFile(const char *filename)
 {
     // Your string containing '1' and '0'
+    std::string binaryString = "110101010";
     std::ifstream inputFile(filename);
     if (!inputFile.is_open())
     {
@@ -226,6 +233,7 @@ void readBinaryFile(const char *filename)
 
             // Write the bit to the text file
             textFile << bit;
+            // std::cout<< bit;
 
             // Move to the next bit position
             bitPosition++;
@@ -271,6 +279,9 @@ void combineFiles(const std::string &file1Path, const std::string &file2Path, co
         throw std::runtime_error("Error opening combined file: " + combinedFilePath);
     }
     combinedFile << combinedContent.rdbuf();
+
+    std::cout << "Files " << file1Path << " and " << file2Path
+              << " combined successfully. Result saved to " << combinedFilePath << std::endl;
 }
 void separateFile(const std::string &combinedFilePath, const std::string &output1FilePath, const std::string &output2FilePath)
 {
@@ -309,6 +320,8 @@ void separateFile(const std::string &combinedFilePath, const std::string &output
         output2File << content.substr(breakingPos + 67); // Length of the delimiter
     }
 
+    std::cout << "File " << combinedFilePath << " separated successfully. Result saved to "
+              << output1FilePath << " and " << output2FilePath << std::endl;
 }
 std::string decompressLZ77(const std::vector<LZ77Token> &tokens, const char *filename)
 {
@@ -324,6 +337,7 @@ std::string decompressLZ77(const std::vector<LZ77Token> &tokens, const char *fil
             // Check if the added character is a newline and print "next" to the console
             if (token.nextChar == '\r')
             {
+                std::cout << "next1" << std::endl;
                 file << decompressedString;
                 decompressedString = "";
             }
@@ -394,87 +408,66 @@ std::vector<LZ77Token> compressLine(const std::string &line, int windowSize, int
     return tokens;
 }
 
-void encodeMapToBinaryFile(const std::map<char, std::string> &myMap, const std::string &filename)
+void encodeMapToBinaryFile(const std::map<char, std::string> &mapper, const std::string &inputfile)
 {
-    // Open a binary file for writing
-    std::ofstream outFileBin(filename + ".bin", std::ios::binary);
-
-    // Write each key-value pair to the binary file
-    for (const auto &entry : myMap)
+    std::ofstream binarrydata(inputfile + ".bin", std::ios::binary);
+    for (const auto &dataEntry : mapper)
     {
-        // Write the char as binary data
-        outFileBin.write(reinterpret_cast<const char *>(&entry.first), sizeof(entry.first));
-
-        // Write the string length as binary data
-        size_t len = entry.second.size();
-        outFileBin.write(reinterpret_cast<const char *>(&len), sizeof(len));
-
-        // Write the string as binary data
-        outFileBin.write(entry.second.c_str(), len);
+        binarrydata.write(reinterpret_cast<const char *>(&dataEntry.first), sizeof(dataEntry.first));
+        size_t len = dataEntry.second.size();
+        binarrydata.write(reinterpret_cast<const char *>(&len), sizeof(len));
+        binarrydata.write(dataEntry.second.c_str(), len);
     }
-
-    // Close the binary file
-    outFileBin.close();
+    binarrydata.close();
 }
-// decode map using bin file
-std::map<char, std::string> decodeBinaryFileToMap(const std::string &filename)
+// decode the binary data into map data structure
+std::map<char, std::string> decodeBinaryFileToMap(const std::string &inputFile)
 {
-    std::map<char, std::string> myMap;
 
-    // Open the binary file for reading
-    std::ifstream inFileBin(filename, std::ios::binary);
-
-    // Check if the file is open
-    if (!inFileBin.is_open())
+    std::ifstream binaryfile(inputFile, std::ios::binary);
+    map<char, string> mapperdatastruct;
+    bool condition2 = (!binaryfile.eof());
+    while (condition2)
     {
-        std::cerr << "Error opening file: " << filename << "\n";
-        return myMap; // Return an empty map on error
-    }
-
-    // Read each key-value pair from the binary file
-    while (!inFileBin.eof())
-    {
+        size_t len = 0;
         char key;
-        size_t len;
-
-        // Read the char from binary data
-        inFileBin.read(reinterpret_cast<char *>(&key), sizeof(key));
-
-        // Check for end-of-file before reading the length
-        if (inFileBin.eof())
+        binaryfile.read(reinterpret_cast<char *>(&key),
+                       sizeof(key));
+        bool condition3 = (binaryfile.eof());
+        if (!condition3)
         {
-            break;
+            binaryfile.read(reinterpret_cast<char *>(&len), sizeof(len));
+            char *databuffer = (char *)malloc(len + 1);
+            binaryfile.read(databuffer, len);
+            databuffer[len] = '\0';
+            mapperdatastruct[key] = std::string(databuffer);
+            condition2 = (!binaryfile.eof());
         }
 
-        // Read the string length from binary data
-        inFileBin.read(reinterpret_cast<char *>(&len), sizeof(len));
-
-        // Read the string from binary data
-        char buffer[len + 1];
-        inFileBin.read(buffer, len);
-        buffer[len] = '\0';
-
-        myMap[key] = std::string(buffer);
+        else if (condition3) break;
     }
 
     // Close the binary file
-    inFileBin.close();
+    binaryfile.close();
 
-    return myMap;
+    return mapperdatastruct;
 }
+
 std::string addBinary(const std::string &a, const std::string &b)
 {
-    std::string result;
-    int carry = 0;
+    string result;
+    int carry ;
 
     // Ensure both strings have the same length by adding leading zeros
     int maxLength = std::max(a.length(), b.length());
-    std::string paddedA = std::string(maxLength - a.length(), '0') + a;
-    std::string paddedB = std::string(maxLength - b.length(), '0') + b;
-
+    string equalA = string(maxLength - a.length(), '0') + a;
+    //initially carry is zero 
+    carry =0;
+    string equalB = string(maxLength - b.length(), '0') + b;
+ 
     for (int i = maxLength - 1; i >= 0; --i)
     {
-        int bitSum = (paddedA[i] - '0') + (paddedB[i] - '0') + carry;
+        int bitSum = (equalA[i] - '0') + (equalB[i] - '0') + carry;
         carry = bitSum / 2;
         result.push_back((bitSum % 2) + '0');
     }
@@ -524,10 +517,18 @@ map<char, string> calcHuffLens(vector<long> &w, vector<char> &z)
             leaf = leaf - 1;
         }
     }
+    for (int i = 0; i < w.size(); i++)
+    {
+        cout << i << " value " << w[i] << endl;
+    }
     w[1] = 0;
     for (int next = 2; next <= n - 1; ++next)
     {
         w[next] = w[w[next]] + 1;
+    }
+    for (int i = 0; i < w.size(); i++)
+    {
+        cout << i << " value " << w[i] << endl;
     }
     int avail = 1;
     int used = 0;
@@ -550,6 +551,10 @@ map<char, string> calcHuffLens(vector<long> &w, vector<char> &z)
         avail = 2 * used;
         depth++;
         used = 0;
+    }
+    for (int i = 0; i < w.size(); i++)
+    {
+        cout << i << " value " << w[i] << endl;
     }
     // assigning code lexigraphically
     vector<string> prefixCode;
@@ -577,9 +582,18 @@ map<char, string> calcHuffLens(vector<long> &w, vector<char> &z)
         result = temp;
         prefixCode.push_back(result);
     }
+    for (int i = 0; i < prefixCode.size(); i++)
+    {
+        cout << i << "i th code " << prefixCode[i] << endl;
+    }
     for (int i = 0; i < z.size(); i++)
     {
         asciiValue[z[i]] = prefixCode[i];
+    }
+    // Iterate over the elements using iterators
+    for (auto it = asciiValue.begin(); it != asciiValue.end(); ++it)
+    {
+        std::cout << it->first << " => " << it->second << std::endl;
     }
     return asciiValue;
 }
@@ -618,6 +632,10 @@ void huffmanencode(string filename)
     // will give me a map that store character to prefix code
     map<char, string> resultAsciiValue = calcHuffLens(charFrequencyInDecreasingOrder, charInDecreasingOrderOfFrequency);
     // Print the result map
+    for (const auto &entry : resultAsciiValue)
+    {
+        std::cout << "Key: " << entry.first << ", Value: " << entry.second << std::endl;
+    }
     ifstream decodeFile(filename);
     char c;
 
@@ -635,8 +653,13 @@ void huffmanencode(string filename)
     {
         while (decodeFile.get(c))
         {
+
+            // binaryFil << resultAsciiValue[c];
             output << resultAsciiValue[c];
         }
+
+        std::cout << "Data written to "
+                  << "HuffOutput.txt" << std::endl;
     }
     else
     {
@@ -690,7 +713,7 @@ void compress(string filename)
     fs::remove("output_file1.txt");
     fs::remove("output_file2.txt");
 }
-void decompressHuffman(string filename, const char* outputFileName ,  map<char, string> result)
+void decompressHuffman(string filename, const char *outputFileName, map<char, string> result)
 {
     // Create a new map with reversed key-value pairs
     std::map<string, char> reverseValue;
@@ -725,10 +748,10 @@ void decompressHuffman(string filename, const char* outputFileName ,  map<char, 
     }
     heoutput.close();
     hufmanoutput.close();
-    decompressLZ77(parseTuples("HDoutput.txt"),outputFileName);
-
+    cout << outputFileName << endl;
+    decompressLZ77(parseTuples("HDoutput.txt"), outputFileName);
 }
-void decompress(const char* filename)
+void decompress(const char *filename)
 {
     // make string here
     readBinaryFile(filename);
@@ -736,6 +759,11 @@ void decompress(const char* filename)
     writeToBinaryFile("output_file1.txt");
     map<char, string> result = decodeBinaryFileToMap("output_file1.bin");
 
+    std::cout << "\nDecoded Map:\n";
+    for (const auto &entry : result)
+    {
+        std::cout << entry.first << ": " << entry.second << "\n";
+    }
     decompressHuffman("output_file2.txt", renameToText(filename), result);
     fs::remove(filename);
     fs::remove("finaloutput.txt");
@@ -745,8 +773,8 @@ void decompress(const char* filename)
     fs::remove("output_file1.bin");
 }
 
-// int main()
-// {
-//     compress("input.txt");
-//     decompress("input.bin");
-// }
+int main()
+{
+    compress("input.txt");
+    decompress("input.bin");
+}
