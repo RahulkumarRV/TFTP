@@ -86,6 +86,13 @@ struct packet {
     uint16_t packet_length;
 };
 
+bool isCompressedFileExis(const char *filename){
+    compress(filename);
+    if(fs::exists(changeExtension(filename, ".bin"))){
+        return true;
+    }else return false;
+}
+
 // create directory structure start
 string getFileOrDirName(string path){
     string result = "";
@@ -197,10 +204,12 @@ pair<char*, size_t> create_ERROR_header(uint16_t opcode, uint16_t errorcode, str
 
 // create the data header of the tftp, which will be contains the opcode, block number and data
 // return data first (packet along with header) and second (size of the packet) 
-pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, const char* data){
+pair<char*, size_t> create_DATA_header(uint16_t opcode, uint16_t blocknumber, const char* data, int _length = -1){
     // 2 bytes for opcode, 2 bytes for block number, therfore that actual data should not be greater that 518 bytes in each packet
     uint16_t datasize = MAX_PACKET_SIZE - sizeof(opcode) - sizeof(blocknumber);
-    int dataLength = strlen(data);
+    int dataLength ;
+    if(_length != -1) dataLength = datasize;
+    else dataLength = _length;
     // if the data passed for the packet exceeds to max capacity of the data in packet return with empty packet
     if(dataLength > datasize){
         cout << "data length exceeds 518 bytes";
