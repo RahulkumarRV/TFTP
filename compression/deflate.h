@@ -773,8 +773,8 @@ void decompress(const char *filename)
     fs::remove("output_file1.bin");
 }
 
-int main()
-{
-    compress("input.txt");
-    decompress("input.bin");
-}
+// int main()
+// {
+//     compress("input.txt");
+//     decompress("input.bin");
+// }
