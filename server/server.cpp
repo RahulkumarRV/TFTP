@@ -76,7 +76,6 @@ int main(int argc, char **argv){
                 sendError(6, errorCodes[6], sockfd, clientAddr);
             }
         }
-        cout << " Thread finished" << endl;
     }
 
     return 0;

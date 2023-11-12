@@ -550,7 +550,8 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
     sockaddr_in addr;
     struct packet* responsepacket;
     uint16_t opcode = DATA, blocknumber = 1;
-
+    // progress bar
+    progressBar pbar;
     while(iteration <= MAX_ITERATIONS && !input_file.eof()){
 
         int minFileSize = min(MAX_PACKET_SIZE - 4, fileSize + 1);
@@ -559,7 +560,8 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
         input_file.read(databuffer, minFileSize);
         if(input_file.eof()){
             databuffer[input_file.gcount()] = '\0';
-        }
+            pbar.updatePercent(100);
+        }else pbar.updatePercent(blocknumber % 100);
         // check timeout for the paket sended
         trycount = MAX_RETRY_REQUEST;
         while(trycount-- > 0){
@@ -594,7 +596,7 @@ void handleServer(struct sockaddr_in serverAddr, const char* filename, int socke
                 
             }else{
                 currentPosition = input_file.tellg();
-                cout << "current position: " << currentPosition << endl;
+                // cout << "current position: " << currentPosition << endl;
                 fileSize -= input_file.gcount();
                 // free(databuffer);
                 iteration++;
